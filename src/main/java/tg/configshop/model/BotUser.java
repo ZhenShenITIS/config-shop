@@ -30,6 +30,6 @@ public class BotUser {
     private String shortId;
     @Column(nullable = false)
     @Builder.Default
-    private Long balance = 0;
+    private Long balance = 0L;
 
 }
