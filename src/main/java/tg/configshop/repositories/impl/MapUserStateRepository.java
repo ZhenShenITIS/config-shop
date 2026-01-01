@@ -3,7 +3,7 @@ package tg.configshop.repositories.impl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 import tg.configshop.repositories.UserStateRepository;
-import tg.configshop.telegram.constants.DialogStageName;
+import tg.configshop.constants.DialogStageName;
 import tg.configshop.telegram.dialogstages.impl.NoneDialogStage;
 
 import java.util.Map;

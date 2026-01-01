@@ -1,10 +1,9 @@
 package tg.configshop.telegram.dialogstages;
 
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
-import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
-import tg.configshop.telegram.constants.DialogStageName;
+import tg.configshop.constants.DialogStageName;
 
 
 public interface DialogStage {

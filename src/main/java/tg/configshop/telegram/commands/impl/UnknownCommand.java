@@ -5,7 +5,7 @@ import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 import tg.configshop.telegram.commands.Command;
-import tg.configshop.telegram.constants.CommandName;
+import tg.configshop.constants.CommandName;
 
 
 @Component

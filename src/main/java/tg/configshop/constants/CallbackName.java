@@ -1,4 +1,4 @@
-package tg.configshop.telegram.constants;
+package tg.configshop.constants;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

@@ -2,10 +2,9 @@ package tg.configshop.telegram.dialogstages.impl;
 
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
-import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
-import tg.configshop.telegram.constants.DialogStageName;
+import tg.configshop.constants.DialogStageName;
 import tg.configshop.telegram.dialogstages.DialogStage;
 
 @Component

@@ -5,7 +5,7 @@ import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 import tg.configshop.repositories.UserStateRepository;
-import tg.configshop.telegram.constants.DialogStageName;
+import tg.configshop.constants.DialogStageName;
 import tg.configshop.telegram.containers.CallbackContainer;
 import tg.configshop.telegram.containers.DialogStateContainer;
 import tg.configshop.telegram.handlers.CallbackQueryHandler;
