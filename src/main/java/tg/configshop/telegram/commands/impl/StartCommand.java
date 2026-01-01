@@ -28,44 +28,10 @@ public class StartCommand implements Command {
         long chatId = message.getChatId();
         String textToSend = MessageText.START_TEXT.getMessageText();
         User user = message.getFrom();
-        long userId = user.getId();
-
         SendMessage sendMessage = SendMessage
                 .builder()
                 .text(textToSend)
                 .chatId(chatId)
-                .replyMarkup(InlineKeyboardMarkup
-                        .builder()
-                        .keyboardRow(new InlineKeyboardRow(
-                                InlineKeyboardButton
-                                        .builder()
-                                        .text(MessageText.PLACEMENTS.getMessageText())
-                                        .callbackData(CallbackName.PLACEMENTS.getCallbackName()+":"+userId)
-                                        .build()))
-                        .keyboardRow( new InlineKeyboardRow
-                                (
-                                        InlineKeyboardButton
-                                                .builder()
-                                                .text(MessageText.PERMUTATIONS.getMessageText())
-                                                .callbackData(CallbackName.PERMUTATIONS.getCallbackName()+":"+userId)
-                                                .build()))
-                        .keyboardRow(new InlineKeyboardRow
-                                (
-                                        InlineKeyboardButton
-                                                .builder()
-                                                .text(MessageText.COMBINATIONS.getMessageText())
-                                                .callbackData(CallbackName.COMBINATIONS.getCallbackName()+":"+userId)
-                                                .build()))
-                        .keyboardRow(new InlineKeyboardRow
-                                (
-                                        InlineKeyboardButton
-                                                .builder()
-                                                .text(MessageText.URN_MODEL.getMessageText())
-                                                .callbackData(CallbackName.URN_MODEL.getCallbackName()+":"+userId)
-                                                .build()
-                                                )
-                                                )
-                        .build())
                 .build();
 
         try {
