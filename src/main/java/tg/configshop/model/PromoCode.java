@@ -28,4 +28,6 @@ public class PromoCode {
     private Long amount;
     private Integer maxUses;
     private Integer currentUses = 0;
+    @Builder.Default
+    private Boolean isReferral = false;
 }
