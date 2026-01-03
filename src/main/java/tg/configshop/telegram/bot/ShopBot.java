@@ -7,7 +7,7 @@ import org.telegram.telegrambots.longpolling.starter.SpringLongPollingBot;
 import org.telegram.telegrambots.longpolling.util.LongPollingSingleThreadUpdateConsumer;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
-import tg.configshop.config.TelegramConfig;
+import tg.configshop.telegram.config.TelegramConfig;
 import tg.configshop.telegram.handlers.CallbackQueryHandler;
 import tg.configshop.telegram.handlers.MessageHandler;
 
@@ -35,12 +35,7 @@ public class ShopBot implements SpringLongPollingBot, LongPollingSingleThreadUpd
 
     @Override
     public void consume(Update update) {
-        if (update.hasCallbackQuery()) {
-            callbackQueryHandler.processCallbackQuery(update.getCallbackQuery(), telegramClient);
-        } else if (update.hasMessage()) {
-            messageHandler.answerMessage(update.getMessage(), telegramClient);
-
-        }
+        Thread.startVirtualThread(() -> consumeUpdate(update));
     }
 
     @Override
@@ -51,5 +46,14 @@ public class ShopBot implements SpringLongPollingBot, LongPollingSingleThreadUpd
     @Override
     public LongPollingUpdateConsumer getUpdatesConsumer() {
         return this;
+    }
+
+    private void consumeUpdate(Update update) {
+        if (update.hasCallbackQuery()) {
+            callbackQueryHandler.processCallbackQuery(update.getCallbackQuery(), telegramClient);
+        } else if (update.hasMessage()) {
+            messageHandler.answerMessage(update.getMessage(), telegramClient);
+
+        }
     }
 }

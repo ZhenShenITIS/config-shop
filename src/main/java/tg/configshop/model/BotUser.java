@@ -11,6 +11,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.Instant;
+
 @Entity
 @Getter
 @Setter
@@ -31,5 +33,8 @@ public class BotUser {
     @Column(nullable = false)
     @Builder.Default
     private Long balance = 0L;
+    @Builder.Default
+    private Integer referralPercentage = 20;
+    private Instant expireAt;
 
 }

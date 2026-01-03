@@ -4,7 +4,7 @@ import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
-import tg.configshop.config.TelegramConfig;
+import tg.configshop.telegram.config.TelegramConfig;
 import tg.configshop.repositories.UserStateRepository;
 import tg.configshop.constants.DialogStageName;
 import tg.configshop.telegram.containers.CommandContainer;

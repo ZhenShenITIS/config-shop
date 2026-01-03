@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableAsync;
 import tg.configshop.telegram.bot.ShopBot;
+import tg.configshop.telegram.config.TelegramConfig;
 import tg.configshop.telegram.containers.DialogStateContainer;
 import tg.configshop.telegram.handlers.CallbackQueryHandler;
 import tg.configshop.telegram.handlers.MessageHandler;
