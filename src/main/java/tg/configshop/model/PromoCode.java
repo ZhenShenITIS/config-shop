@@ -5,6 +5,8 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -30,4 +32,6 @@ public class PromoCode {
     private Integer currentUses = 0;
     @Builder.Default
     private Boolean isReferral = false;
+    @ManyToOne
+    private BotUser referrer;
 }

@@ -23,9 +23,7 @@ public class RegistrationServiceImpl implements RegistrationService {
     }
 
     @Override
-    public BotUser registerUser(Message message) {
-        User user = message.getFrom();
-        Long referrerId = getReferrerId(message);
+    public BotUser registerUser(User user, Long referrerId) {
         RemnawaveUserResponse remnaUser = remnawaveClient.createBasicUser(user.getUserName(), user.getId());
         BotUser botUser = BotUser
                 .builder()
@@ -40,19 +38,9 @@ public class RegistrationServiceImpl implements RegistrationService {
         if (referrerId != null) {
             referralService.createReferral(referrerId, user.getId());
         }
+        referralService.createReferralCode(user.getId());
         return botUser;
     }
 
-    private Long getReferrerId (Message message) {
-        String[] parts = message.getText().split(" ");
-        if (parts.length > 1) {
-            String payload = parts[1];
-            try {
-                return Long.parseLong(payload);
-            } catch (NumberFormatException e) {
-                return null;
-            }
-        }
-        return null;
-    }
+
 }

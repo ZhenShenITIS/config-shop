@@ -21,16 +21,17 @@ public class CallbackQueryHandlerImpl implements CallbackQueryHandler {
 
     @Override
     public void processCallbackQuery(CallbackQuery callbackQuery, TelegramClient telegramClient) {
-        Long userAllowId = Long.parseLong(callbackQuery.getData().split(":")[1]);
+//        Long userAllowId = Long.parseLong(callbackQuery.getData().split(":")[1]);
         Long userCallbackId = callbackQuery.getFrom().getId();
-        if (userAllowId.equals(userCallbackId)) {
-            DialogStageName stage = userStateRepository.get(userCallbackId);
-            if (!stage.equals(DialogStageName.NONE)) {
-                dialogStateContainer.retrieveDialogStage(stage.getDialogStageName()).processCallbackQuery(callbackQuery, telegramClient);
-                return;
-            }
-            String callbackIdentifier = callbackQuery.getData().split(":")[0];
-            callbackContainer.retrieveCallback(callbackIdentifier).processCallback(callbackQuery, telegramClient);
+//        if (!userAllowId.equals(userCallbackId)) {
+//            return;
+//        }
+        DialogStageName stage = userStateRepository.get(userCallbackId);
+        if (!stage.equals(DialogStageName.NONE)) {
+            dialogStateContainer.retrieveDialogStage(stage.getDialogStageName()).processCallbackQuery(callbackQuery, telegramClient);
+            return;
         }
+        String callbackIdentifier = callbackQuery.getData().split(":")[0];
+        callbackContainer.retrieveCallback(callbackIdentifier).processCallback(callbackQuery, telegramClient);
     }
 }

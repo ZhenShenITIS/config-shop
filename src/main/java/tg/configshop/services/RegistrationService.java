@@ -6,6 +6,6 @@ import tg.configshop.model.BotUser;
 
 public interface RegistrationService {
     boolean isRegistered (Long userId);
-    BotUser registerUser (Message message);
+    BotUser registerUser (User user, Long referrerId);
 
 }
