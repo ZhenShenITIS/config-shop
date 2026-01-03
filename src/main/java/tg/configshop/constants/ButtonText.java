@@ -16,7 +16,8 @@ public enum ButtonText {
     TOP_UP("💳 Пополнить"),
     BACK("🔙 Назад"),
     REF_LIST("👥 Список рефералов"),
-    REF_ANALYTICS("📈 Аналитика");
+    REF_ANALYTICS("📈 Аналитика"),
+    BUY_SUB("💳 Продлить / Купить");
 
     private final String text;
 }

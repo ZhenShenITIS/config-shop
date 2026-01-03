@@ -17,4 +17,9 @@ public class DateUtil {
         ZonedDateTime zdt = date.atZone(ZoneId.of("Europe/Moscow"));
         return zdt.format(formatter);
     }
+
+    public static long getDaysLeft(BotUser botUser) {
+        if (isExpired(botUser)) return 0;
+        return java.time.Duration.between(Instant.now(), botUser.getExpireAt()).toDays();
+    }
 }

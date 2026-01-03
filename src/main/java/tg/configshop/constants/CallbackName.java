@@ -21,8 +21,9 @@ public enum CallbackName {
     REF_LIST("ref_list"),
     REF_ANALYTICS("ref_analytics"),
 
+    BUY_SUB_MENU("buy_sub_menu"),
 
-    BACK_TO_MENU("back1");
+    BACK_TO_MENU("back");
 
     private final String callbackName;
 
