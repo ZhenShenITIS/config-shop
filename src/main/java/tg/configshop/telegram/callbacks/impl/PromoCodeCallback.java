@@ -10,13 +10,17 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 import tg.configshop.constants.ButtonText;
 import tg.configshop.constants.CallbackName;
+import tg.configshop.constants.DialogStageName;
 import tg.configshop.constants.MessageText;
+import tg.configshop.repositories.UserStateRepository;
 import tg.configshop.telegram.callbacks.Callback;
 
 @Component
 @RequiredArgsConstructor
 public class PromoCodeCallback implements Callback {
     private final CallbackName callbackName = CallbackName.PROMO_CODE;
+
+    private final UserStateRepository stateRepository;
 
     @Override
     public CallbackName getCallback() {
@@ -28,7 +32,7 @@ public class PromoCodeCallback implements Callback {
         long chatId = callbackQuery.getMessage().getChatId();
         int messageId = callbackQuery.getMessage().getMessageId();
         long userId = callbackQuery.getFrom().getId();
-        // TODO Put user in dialog stage
+
         String text = MessageText.PROMO_CODE_REQUEST.getMessageText();
 
         InlineKeyboardMarkup markup = InlineKeyboardMarkup.builder()
@@ -53,5 +57,7 @@ public class PromoCodeCallback implements Callback {
         } catch (Exception e) {
             e.printStackTrace();
         }
+        stateRepository.put(userId, DialogStageName.PROMO_CODE_INPUT);
+
     }
 }

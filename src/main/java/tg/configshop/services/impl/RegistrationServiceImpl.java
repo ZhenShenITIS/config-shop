@@ -24,7 +24,13 @@ public class RegistrationServiceImpl implements RegistrationService {
 
     @Override
     public BotUser registerUser(User user, Long referrerId) {
-        RemnawaveUserResponse remnaUser = remnawaveClient.createBasicUser(user.getUserName(), user.getId());
+        String username;
+        if (user.getUserName() == null) {
+            username = user.getId().toString();
+        } else {
+            username = user.getUserName();
+        }
+        RemnawaveUserResponse remnaUser = remnawaveClient.createBasicUser(username, user.getId());
         BotUser botUser = BotUser
                 .builder()
                 .id(user.getId())

@@ -7,6 +7,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -21,7 +22,7 @@ import java.time.Instant;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@Table(name = "promo_code_uses")
+@Table(name = "promo_code_uses", uniqueConstraints = @UniqueConstraint(columnNames = {"promo_code_id", "bot_user_id"}))
 public class PromoCodeUse {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
