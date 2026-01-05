@@ -3,19 +3,27 @@ package tg.configshop.util;
 
 
 import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 import tg.configshop.model.Subscription;
 import tg.configshop.repositories.SubscriptionRepository;
+import tg.configshop.services.SubscriptionService;
 
 import java.util.ArrayList;
 import java.util.List;
 
 @Component
-@AllArgsConstructor
+@RequiredArgsConstructor
 public class SubscriptionsInitializer implements CommandLineRunner {
 
     private final SubscriptionRepository subscriptionRepository;
+
+    private final SubscriptionService subscriptionService;
+
+
+
 
     @Override
     public void run(String... args) {
@@ -31,11 +39,11 @@ public class SubscriptionsInitializer implements CommandLineRunner {
 
         for (int months : monthsOptions) {
             int days = months * 30;
-            for (int devices = 2; devices <= 11; devices++) {
+            for (int devices = subscriptionService.getMinDeviceCount(); devices <= subscriptionService.getMaxDeviceCount(); devices++) {
                 Subscription sub = new Subscription();
                 sub.setDurationDays(days);
                 sub.setDeviceCount(devices);
-                sub.setTrafficLimitGb(devices * 300);
+                sub.setTrafficLimitGb(devices * subscriptionService.getTrafficLimitPerDevice());
                 String periodName = switch (months) {
                     case 1 -> "1 месяц";
                     case 12 -> "1 год";
@@ -44,7 +52,7 @@ public class SubscriptionsInitializer implements CommandLineRunner {
                 };
                 sub.setName(String.format("%s (%d устр.)", periodName, devices));
 
-                long cost = calculateCost(months, devices);
+                long cost = calculateCost(days, devices);
                 sub.setCost(cost);
 
                 sub.setDescription("VPN подписка на %s дней и %s устройств".formatted(days, devices));
@@ -57,20 +65,11 @@ public class SubscriptionsInitializer implements CommandLineRunner {
         System.out.println("[Init] Готово! Добавлено " + subscriptions.size() + " тарифов.");
     }
 
-    private long calculateCost(int months, int devices) {
-        long basePriceForTwo;
-        long extraPerDevice;
-
-        switch (months) {
-            case 1 ->  { basePriceForTwo = 180;  extraPerDevice = 50; }
-            case 3 ->  { basePriceForTwo = 420;  extraPerDevice = 100; }
-            case 6 ->  { basePriceForTwo = 700;  extraPerDevice = 150; }
-            case 12 -> { basePriceForTwo = 1200; extraPerDevice = 200; }
-            default -> throw new IllegalArgumentException("Неизвестный период: " + months);
-        }
-
-        int extraDevices = devices - 2;
+    private long calculateCost(int days, int devices) {
+        long basePrice = subscriptionService.getBaseSubscriptionCostByDays(days);
+        long extraPerDevice = subscriptionService.getExtraPricePerDeviceByDays(days);
+        int extraDevices = devices - subscriptionService.getMinDeviceCount();
         if (extraDevices < 0) extraDevices = 0;
-        return basePriceForTwo + (extraDevices * extraPerDevice);
+        return basePrice + (extraDevices * extraPerDevice);
     }
 }

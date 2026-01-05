@@ -34,7 +34,11 @@ public class BotUser {
     @Builder.Default
     private Long balance = 0L;
     @Builder.Default
-    private Integer referralPercentage = 32;
+    private Integer referralPercentage1lvl = 35;
+    @Builder.Default
+    private Integer referralPercentage2lvl = 20;
+    @Builder.Default
+    private Integer referralPercentage3lvl = 10;
     private Instant expireAt;
     @Builder.Default
     private Instant createdAt = Instant.now();

@@ -82,11 +82,6 @@ public class ReferralServiceImpl implements ReferralService {
     }
 
     @Override
-    public int referralPercentage(Long userId) {
-        return botUserRepository.findById(userId).orElse(BotUser.builder().referralPercentage(32).build()).getReferralPercentage();
-    }
-
-    @Override
     public List<BotUser> getAllReferrals(Long userId) {
         return referralRepository.findAllByReferrer(botUserRepository.getReferenceById(userId));
     }

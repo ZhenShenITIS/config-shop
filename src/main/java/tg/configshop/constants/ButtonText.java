@@ -17,7 +17,17 @@ public enum ButtonText {
     BACK("🔙 Назад"),
     REF_LIST("👥 Список рефералов"),
     REF_ANALYTICS("📈 Аналитика"),
-    BUY_SUB("💳 Продлить / Купить");
+    WITHDRAW("📤 Вывод"),
+    BUY_SUB("💳 Продлить / Купить"),
+    SUB_PERIOD_1_MONTH("📅 1 месяц — %d ₽"),
+    SUB_PERIOD_3_MONTH("📅 3 месяца — %d ₽"),
+    SUB_PERIOD_6_MONTH("📅 6 месяцев — %d ₽"),
+    SUB_PERIOD_12_MONTH("📅 1 год — %d ₽"),
+    DEVICE_OPTION_SELECTED("✅ %d (%d ₽)"),
+    DEVICE_OPTION_UNSELECTED("🔘 %d (%d ₽)"),
+    CONFIRM_PAYMENT("✅ Оплатить %d ₽"),
+    CONFIRM_BUY("✅ Подтвердить"),
+    BACK_TO_MENU("🔙 В главное меню");
 
     private final String text;
 }

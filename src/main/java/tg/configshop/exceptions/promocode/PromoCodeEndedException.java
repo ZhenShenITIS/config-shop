@@ -1,4 +1,4 @@
-package tg.configshop.exceptions;
+package tg.configshop.exceptions.promocode;
 
 public class PromoCodeEndedException extends RuntimeException {
     public PromoCodeEndedException(String message) {

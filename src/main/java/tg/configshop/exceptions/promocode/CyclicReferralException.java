@@ -1,4 +1,4 @@
-package tg.configshop.exceptions;
+package tg.configshop.exceptions.promocode;
 
 public class CyclicReferralException extends RuntimeException {
     public CyclicReferralException(String message) {

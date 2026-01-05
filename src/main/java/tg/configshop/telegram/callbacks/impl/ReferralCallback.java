@@ -12,7 +12,9 @@ import org.telegram.telegrambots.meta.generics.TelegramClient;
 import tg.configshop.constants.ButtonText;
 import tg.configshop.constants.CallbackName;
 import tg.configshop.constants.MessageText;
+import tg.configshop.model.BotUser;
 import tg.configshop.services.ReferralService; // Твой интерфейс
+import tg.configshop.services.UserService;
 import tg.configshop.telegram.callbacks.Callback;
 
 @Component
@@ -20,6 +22,7 @@ import tg.configshop.telegram.callbacks.Callback;
 public class ReferralCallback implements Callback {
     private final CallbackName callbackName = CallbackName.REFERRAL;
     private final ReferralService referralService;
+    private final UserService userService;
 
     @Value("${TELEGRAM_BOT_USERNAME}")
     private String botUsername;
@@ -39,10 +42,12 @@ public class ReferralCallback implements Callback {
         int activeCount = referralService.getActiveReferralCount(userId);
         long profit = referralService.getAllProfit(userId);
         String promoCode = referralService.getReferralPromoCode(userId);
-        int percentage = referralService.referralPercentage(userId);
+        BotUser botUser = userService.getUser(userId);
 
-        int lvl2 = percentage / 2;
-        int lvl3 = percentage / 4;
+        int lvl1 = botUser.getReferralPercentage1lvl();
+
+        int lvl2 = botUser.getReferralPercentage2lvl();
+        int lvl3 = botUser.getReferralPercentage3lvl();
 
 
         String refLink = String.format("https://t.me/%s?start=%d", botUsername, userId);
@@ -52,7 +57,7 @@ public class ReferralCallback implements Callback {
                 activeCount,
                 profit,
                 promoCode,
-                percentage,
+                lvl1,
                 lvl2,
                 lvl3,
                 refLink
@@ -66,8 +71,8 @@ public class ReferralCallback implements Callback {
                                 .callbackData(CallbackName.REF_LIST.getCallbackName())
                                 .build(),
                         InlineKeyboardButton.builder()
-                                .text(ButtonText.REF_ANALYTICS.getText())
-                                .callbackData(CallbackName.REF_ANALYTICS.getCallbackName())
+                                .text(ButtonText.WITHDRAW.getText())
+                                .callbackData(CallbackName.WITHDRAW.getCallbackName())
                                 .build()
                 ))
                 .keyboardRow(new InlineKeyboardRow(

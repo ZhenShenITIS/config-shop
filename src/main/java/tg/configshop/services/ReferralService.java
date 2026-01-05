@@ -11,7 +11,6 @@ public interface ReferralService {
     int getActiveReferralCount (Long userId);
     long getAllProfit (Long userId);
     String getReferralPromoCode (Long userId);
-    int referralPercentage (Long userId);
     List<BotUser> getAllReferrals (Long userId);
 
 }
