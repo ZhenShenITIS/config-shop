@@ -1,4 +1,4 @@
-package tg.configshop.telegram.callbacks.impl;
+package tg.configshop.telegram.callbacks.impl.subscription;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;

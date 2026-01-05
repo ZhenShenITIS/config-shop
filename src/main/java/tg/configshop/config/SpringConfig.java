@@ -16,9 +16,9 @@ import tg.configshop.telegram.handlers.MessageHandler;
 @EnableAsync
 public class SpringConfig {
 
-    @Bean
-    public ShopBot shopBot(TelegramConfig telegramConfig, CallbackQueryHandler callbackQueryHandler, MessageHandler messageHandler, DialogStateContainer dialogStateContainer) {
-        return new ShopBot(telegramConfig, callbackQueryHandler, messageHandler);
-
-    }
+//    @Bean
+//    public ShopBot shopBot(TelegramConfig telegramConfig, CallbackQueryHandler callbackQueryHandler, MessageHandler messageHandler, DialogStateContainer dialogStateContainer) {
+//        return new ShopBot(telegramConfig, callbackQueryHandler, messageHandler);
+//
+//    }
 }

@@ -1,5 +1,6 @@
 package tg.configshop.telegram.bot;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.client.okhttp.OkHttpTelegramClient;
 import org.telegram.telegrambots.longpolling.interfaces.LongPollingUpdateConsumer;
@@ -13,23 +14,16 @@ import tg.configshop.telegram.handlers.MessageHandler;
 
 
 @Component
+@RequiredArgsConstructor
 public class ShopBot implements SpringLongPollingBot, LongPollingSingleThreadUpdateConsumer {
 
     private final TelegramClient telegramClient;
 
     private final TelegramConfig telegramConfig;
 
-    private CallbackQueryHandler callbackQueryHandler;
+    private final CallbackQueryHandler callbackQueryHandler;
 
-    private MessageHandler messageHandler;
-
-
-    public ShopBot(TelegramConfig telegramConfig, CallbackQueryHandler callbackQueryHandler, MessageHandler messageHandler) {
-        this.telegramConfig = telegramConfig;
-        this.telegramClient = new OkHttpTelegramClient(getBotToken());
-        this.callbackQueryHandler = callbackQueryHandler;
-        this.messageHandler = messageHandler;
-    }
+    private final MessageHandler messageHandler;
 
 
 

@@ -1,9 +1,11 @@
 package tg.configshop.services.impl;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tg.configshop.constants.TopUpSource;
+import tg.configshop.events.ReferralCreatedEvent;
 import tg.configshop.model.BotUser;
 import tg.configshop.model.PromoCode;
 import tg.configshop.model.Referral;
@@ -24,6 +26,7 @@ public class ReferralServiceImpl implements ReferralService {
     private final BotUserRepository botUserRepository;
     private final PromoCodeRepository promoCodeRepository;
     private final TopUpRepository topUpRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     private final String PROMO_CODE_PREFIX = "REF_";
     private final Long REFERRAL_PROMO_CODE_BASE_AMOUNT = 100L;
@@ -33,18 +36,13 @@ public class ReferralServiceImpl implements ReferralService {
     public void createReferral(Long referrerId, Long referralId) {
         Optional<Referral> existingReferral = referralRepository.findByReferral_Id(referralId);
 
-        if (existingReferral.isPresent()) {
-            Referral referral = existingReferral.get();
-            referral.setReferrer(botUserRepository.getReferenceById(referrerId));
-            referral.setCreatedAt(Instant.now());
-            referralRepository.save(referral);
-        } else {
-
+        if (existingReferral.isEmpty()) {
             referralRepository.save(Referral
                     .builder()
                     .referrer(botUserRepository.getReferenceById(referrerId))
                     .referral(botUserRepository.getReferenceById(referralId))
                     .build());
+            eventPublisher.publishEvent(new ReferralCreatedEvent(this, referrerId, referralId));
         }
     }
 
