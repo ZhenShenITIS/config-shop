@@ -37,5 +37,7 @@ public class TopUp {
     @ManyToOne
     private BotUser botUser;
     private String externalId;
+    @ManyToOne
+    private BotUser referral;
 
 }

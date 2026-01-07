@@ -2,9 +2,14 @@ package tg.configshop.services.impl;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tg.configshop.constants.TopUpSource;
+import tg.configshop.dto.ReferralWithProfit;
 import tg.configshop.events.ReferralCreatedEvent;
 import tg.configshop.model.BotUser;
 import tg.configshop.model.PromoCode;
@@ -29,7 +34,8 @@ public class ReferralServiceImpl implements ReferralService {
     private final ApplicationEventPublisher eventPublisher;
 
     private final String PROMO_CODE_PREFIX = "REF_";
-    private final Long REFERRAL_PROMO_CODE_BASE_AMOUNT = 100L;
+    private final long REFERRAL_PROMO_CODE_BASE_AMOUNT = 100L;
+    private final int REFERRAL_PAGE_SIZE = 15;
 
     @Override
     @Transactional
@@ -82,5 +88,11 @@ public class ReferralServiceImpl implements ReferralService {
     @Override
     public List<BotUser> getAllReferrals(Long userId) {
         return referralRepository.findAllByReferrer(botUserRepository.getReferenceById(userId));
+    }
+
+    @Override
+    public Page<ReferralWithProfit> getReferralsWithProfit(Long userId, int pageNumber) {
+        Pageable page = PageRequest.of(pageNumber, REFERRAL_PAGE_SIZE);
+        return referralRepository.getReferralsWithProfit(userId, page);
     }
 }

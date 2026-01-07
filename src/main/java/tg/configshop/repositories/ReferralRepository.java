@@ -1,9 +1,12 @@
 package tg.configshop.repositories;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import tg.configshop.constants.TopUpSource;
+import tg.configshop.dto.ReferralWithProfit;
 import tg.configshop.model.BotUser;
 import tg.configshop.model.Referral;
 
@@ -45,4 +48,26 @@ public interface ReferralRepository extends JpaRepository<Referral, Long> {
     boolean isUserAncestorOf(@Param("currentUserId") Long currentUserId,
                              @Param("potentialReferrerId") Long potentialReferrerId);
 
+
+
+
+    @Query("""
+                SELECT new tg.configshop.dto.ReferralWithProfit(
+                    r.referral, 
+                    CAST (COALESCE(SUM(tu.value), 0) AS LONG),
+                    r.createdAt
+                  
+                )
+                FROM Referral r
+                LEFT JOIN TopUp tu 
+                    ON tu.referral = r.referral 
+                    AND tu.topUpSource = 'REFERRAL'
+                WHERE r.referrer.id = :referrerId
+                GROUP BY r.referral, r.createdAt
+                ORDER BY r.createdAt DESC 
+            """)
+    Page<ReferralWithProfit> getReferralsWithProfit(
+            @Param("referrerId") Long referrerId,
+            Pageable pageable
+    );
 }

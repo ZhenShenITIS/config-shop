@@ -30,6 +30,9 @@ public enum ButtonText {
     INFO("ℹ️Инфо"),
     POLICY("Политика"),
     AGREEMENT("Соглашение"),
+    BACK_PAGE("⬅️"),
+    FORWARD_PAGE("➡️"),
+    EMPTY("⠀"),
     BACK_TO_MENU("🔙 В главное меню");
 
     private final String text;
