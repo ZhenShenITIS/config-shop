@@ -34,6 +34,12 @@ public enum CallbackName {
 
     PURCHASE("pay"),
 
+    DOCS_CONFIRM("docs_confirm"),
+
+    DOCS_INFO("docs_info"),
+
+    DOCS_DECLINE("docs_decline"),
+
     BACK_TO_MENU("back");
 
     private final String callbackName;

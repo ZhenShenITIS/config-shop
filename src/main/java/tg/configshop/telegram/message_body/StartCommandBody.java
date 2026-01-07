@@ -40,7 +40,7 @@ public class StartCommandBody {
         long userId = user.getId();
         BotUser botUser;
         if (!registrationService.isRegistered(userId)) {
-            botUser = registrationService.registerUser(user, referrerId);
+            return getLegalAgreementMessage(user.getFirstName(), referrerId);
         } else {
             botUser = userService.getUser(userId);
         }
@@ -108,6 +108,33 @@ public class StartCommandBody {
 
         return new BotMessageParams(text, keyboard);
 
+    }
+
+    private BotMessageParams getLegalAgreementMessage(String firstName, Long referrerId) {
+
+        String text = MessageText.START_LEGAL_NOTICE.getMessageText()
+                .formatted(firstName, agreementUrl, policyUrl);
+        String confirmCallbackData = CallbackName.DOCS_CONFIRM.getCallbackName();
+        if (referrerId != null) {
+            confirmCallbackData += ":" + referrerId;
+        }
+
+        InlineKeyboardMarkup keyboard = InlineKeyboardMarkup.builder()
+                .keyboardRow(new InlineKeyboardRow(
+                        InlineKeyboardButton.builder()
+                                .text(ButtonText.ACCEPT_RULES.getText())
+                                .callbackData(confirmCallbackData)
+                                .build()
+                ))
+                .keyboardRow(new InlineKeyboardRow(
+                        InlineKeyboardButton.builder()
+                                .text(ButtonText.DECLINE_RULES.getText())
+                                .callbackData(CallbackName.DOCS_DECLINE.getCallbackName())
+                                .build()
+                ))
+                .build();
+
+        return new BotMessageParams(text, keyboard);
     }
 
 }

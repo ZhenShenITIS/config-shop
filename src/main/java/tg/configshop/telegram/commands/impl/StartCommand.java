@@ -10,6 +10,7 @@ import tg.configshop.telegram.commands.Command;
 import tg.configshop.constants.CommandName;
 import tg.configshop.telegram.dto.BotMessageParams;
 import tg.configshop.telegram.message_body.StartCommandBody;
+import tg.configshop.util.MessageUtils;
 
 
 @Component
@@ -25,7 +26,7 @@ public class StartCommand implements Command {
 
     @Override
     public void handleCommand(Message message, TelegramClient telegramClient) {
-        BotMessageParams params = startCommandBody.getMessage(message.getFrom(), getReferrerId(message));
+        BotMessageParams params = startCommandBody.getMessage(message.getFrom(), MessageUtils.getReferrerId(message));
         SendMessage sendMessage = SendMessage
                 .builder()
                 .chatId(message.getChatId())
@@ -40,16 +41,5 @@ public class StartCommand implements Command {
         }
     }
 
-    private Long getReferrerId (Message message) {
-        String[] parts = message.getText().split(" ");
-        if (parts.length > 1) {
-            String payload = parts[1];
-            try {
-                return Long.parseLong(payload);
-            } catch (NumberFormatException e) {
-                return null;
-            }
-        }
-        return null;
-    }
+
 }

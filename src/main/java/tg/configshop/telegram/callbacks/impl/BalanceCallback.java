@@ -52,9 +52,7 @@ public class BalanceCallback implements Callback {
                                 InlineKeyboardButton.builder()
                                         .text(ButtonText.TOP_UP.getText())
                                         .callbackData(CallbackName.TOP_UP.getCallbackName())
-                                        .build()
-                        ))
-                        .keyboardRow(new InlineKeyboardRow(
+                                        .build(),
                                 InlineKeyboardButton.builder()
                                         .text(ButtonText.BACK.getText())
                                         .callbackData(CallbackName.BACK_TO_MENU.getCallbackName())

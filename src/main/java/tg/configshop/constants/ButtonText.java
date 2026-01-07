@@ -33,6 +33,8 @@ public enum ButtonText {
     BACK_PAGE("⬅️"),
     FORWARD_PAGE("➡️"),
     EMPTY("⠀"),
+    ACCEPT_RULES("✅ Принимаю"),
+    DECLINE_RULES("❌ Отказаться"),
     BACK_TO_MENU("🔙 В главное меню");
 
     private final String text;
