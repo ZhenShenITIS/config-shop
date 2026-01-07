@@ -1,5 +1,6 @@
 package tg.configshop.telegram.callbacks.impl;
 
+import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
@@ -7,6 +8,7 @@ import tg.configshop.constants.CallbackName;
 import tg.configshop.constants.MessageText;
 import tg.configshop.telegram.callbacks.Callback;
 
+@Component
 public class DocsDeclineCallback implements Callback {
     @Override
     public CallbackName getCallback() {

@@ -36,6 +36,7 @@ public class StartCommandBody {
     private String policyUrl;
 
 
+
     public BotMessageParams getMessage (User user, Long referrerId) {
         long userId = user.getId();
         BotUser botUser;
@@ -95,13 +96,8 @@ public class StartCommandBody {
                 .keyboardRow(new InlineKeyboardRow(
                         InlineKeyboardButton
                                 .builder()
-                                .text(ButtonText.POLICY.getText())
-                                .url(policyUrl)
-                                .build(),
-                        InlineKeyboardButton
-                                .builder()
-                                .text(ButtonText.AGREEMENT.getText())
-                                .url(agreementUrl)
+                                .text(ButtonText.INFO.getText())
+                                .callbackData(CallbackName.DOCS_INFO.getCallbackName())
                                 .build()
                 ))
                 .build();
