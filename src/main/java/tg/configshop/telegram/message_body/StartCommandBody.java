@@ -15,6 +15,7 @@ import tg.configshop.services.RegistrationService;
 import tg.configshop.services.UserService;
 import tg.configshop.telegram.dto.BotMessageParams;
 import tg.configshop.util.DateUtil;
+import tg.configshop.util.StringUtil;
 
 @Component
 @RequiredArgsConstructor
@@ -28,6 +29,13 @@ public class StartCommandBody {
     @Value("${SUPPORT_USERNAME}")
     private String supportUsername;
 
+    @Value("${AGREEMENT_URL}")
+    private String agreementUrl;
+
+    @Value("${POLICY_URL}")
+    private String policyUrl;
+
+
     public BotMessageParams getMessage (User user, Long referrerId) {
         long userId = user.getId();
         BotUser botUser;
@@ -37,10 +45,12 @@ public class StartCommandBody {
             botUser = userService.getUser(userId);
         }
 
+        String firstName = StringUtil.getSafeHtmlString(user.getFirstName());
+
         String text = DateUtil.isExpired(botUser) ?
-                MessageText.START_TEXT_EXPIRED.getMessageText().formatted(user.getFirstName())
+                MessageText.START_TEXT_EXPIRED.getMessageText().formatted(firstName)
                 :
-                MessageText.START_TEXT_ACTIVE.getMessageText().formatted(user.getFirstName(), DateUtil.getDateEndSubscription(botUser));
+                MessageText.START_TEXT_ACTIVE.getMessageText().formatted(firstName, DateUtil.getDateEndSubscription(botUser));
 
         InlineKeyboardMarkup keyboard = InlineKeyboardMarkup
                 .builder()
@@ -80,6 +90,18 @@ public class StartCommandBody {
                                 .builder()
                                 .text(ButtonText.SUPPORT.getText())
                                 .url("t.me/" + supportUsername)
+                                .build()
+                ))
+                .keyboardRow(new InlineKeyboardRow(
+                        InlineKeyboardButton
+                                .builder()
+                                .text(ButtonText.POLICY.getText())
+                                .url(policyUrl)
+                                .build(),
+                        InlineKeyboardButton
+                                .builder()
+                                .text(ButtonText.AGREEMENT.getText())
+                                .url(agreementUrl)
                                 .build()
                 ))
                 .build();

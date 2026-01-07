@@ -35,6 +35,7 @@ public class BackToMenuCallback implements Callback {
                 .messageId(messageId)
                 .text(params.text())
                 .replyMarkup(params.inlineKeyboard())
+                .parseMode("HTML")
                 .build();
 
         try {

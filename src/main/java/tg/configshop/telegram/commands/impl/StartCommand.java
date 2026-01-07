@@ -31,6 +31,7 @@ public class StartCommand implements Command {
                 .chatId(message.getChatId())
                 .replyMarkup(params.inlineKeyboard())
                 .text(params.text())
+                .parseMode("HTML")
                 .build();
         try {
             telegramClient.execute(sendMessage);

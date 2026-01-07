@@ -27,6 +27,9 @@ public enum ButtonText {
     DEVICE_OPTION_UNSELECTED("🔘 %d (%d ₽)"),
     CONFIRM_PAYMENT("✅ Оплатить %d ₽"),
     CONFIRM_BUY("✅ Подтвердить"),
+    INFO("ℹ️Инфо"),
+    POLICY("Политика"),
+    AGREEMENT("Соглашение"),
     BACK_TO_MENU("🔙 В главное меню");
 
     private final String text;
