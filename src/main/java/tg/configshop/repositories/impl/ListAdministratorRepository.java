@@ -21,7 +21,7 @@ public class ListAdministratorRepository implements AdministratorRepository {
         ArrayList<Long> adminList = new ArrayList<>();
         for (String s : adminsStrings) {
             try {
-                adminList.add(Long.parseLong(s));
+                adminList.add(Long.parseLong(s.trim()));
             } catch (NumberFormatException e) {
                 throw new RuntimeException("Ошибка парсинга ID администратора: " + s, e);
             }

@@ -6,6 +6,8 @@ import tg.configshop.model.BotUser;
 import tg.configshop.repositories.BotUserRepository;
 import tg.configshop.services.UserService;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
@@ -14,5 +16,10 @@ public class UserServiceImpl implements UserService {
     @Override
     public BotUser getUser(Long userId) {
         return botUserRepository.findById(userId).orElse(null);
+    }
+
+    @Override
+    public List<BotUser> getUser(String username) {
+        return botUserRepository.findByUsernameIgnoreCase(username);
     }
 }

@@ -7,6 +7,7 @@ import lombok.Getter;
 @Getter
 public enum CommandName {
     UNKNOWN("null"),
+    FIND_USER("/find_user"),
     START("/start");
 
 
