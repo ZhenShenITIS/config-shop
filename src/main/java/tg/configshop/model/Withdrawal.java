@@ -36,6 +36,7 @@ public class Withdrawal {
     private Instant createdAt = Instant.now();
     private Long amount;
     @Enumerated(EnumType.STRING)
+    @Builder.Default
     private WithdrawalStatus status = WithdrawalStatus.IN_PROGRESS;
     @Enumerated(EnumType.STRING)
     // CARD, CRYPTO

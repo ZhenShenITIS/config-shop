@@ -46,13 +46,13 @@ public class BalanceCallback implements Callback {
                                 InlineKeyboardButton.builder()
                                         .text(ButtonText.HISTORY.getText())
                                         .callbackData(CallbackName.HISTORY.getCallbackName())
-                                        .build()
-                        ))
-                        .keyboardRow(new InlineKeyboardRow(
+                                        .build(),
                                 InlineKeyboardButton.builder()
                                         .text(ButtonText.TOP_UP.getText())
                                         .callbackData(CallbackName.TOP_UP.getCallbackName())
-                                        .build(),
+                                        .build()
+                        ))
+                        .keyboardRow(new InlineKeyboardRow(
                                 InlineKeyboardButton.builder()
                                         .text(ButtonText.BACK.getText())
                                         .callbackData(CallbackName.BACK_TO_MENU.getCallbackName())
