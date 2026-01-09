@@ -2,6 +2,7 @@ package tg.configshop.services.impl;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import tg.configshop.model.BotUser;
 import tg.configshop.repositories.BotUserRepository;
 import tg.configshop.services.UserService;
@@ -21,5 +22,14 @@ public class UserServiceImpl implements UserService {
     @Override
     public List<BotUser> getUser(String username) {
         return botUserRepository.findByUsernameIgnoreCase(username);
+    }
+
+    @Override
+    @Transactional
+    public void addToBalance(Long userId, Long amountToAdd) {
+        BotUser user = botUserRepository.findByIdWithLock(userId)
+                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+        user.setBalance(user.getBalance() + amountToAdd);
+        botUserRepository.save(user);
     }
 }

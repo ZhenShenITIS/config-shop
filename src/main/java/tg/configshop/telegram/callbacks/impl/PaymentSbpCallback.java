@@ -11,20 +11,18 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 import tg.configshop.constants.ButtonText;
 import tg.configshop.constants.CallbackName;
+import tg.configshop.constants.DialogStageName;
 import tg.configshop.constants.MessageText;
-import tg.configshop.model.BotUser;
-import tg.configshop.services.UserService;
+import tg.configshop.repositories.UserStateRepository;
 import tg.configshop.telegram.callbacks.Callback;
 
 @Component
 @RequiredArgsConstructor
-public class BalanceCallback implements Callback {
-    private final CallbackName callbackName = CallbackName.BALANCE;
-    private final UserService userService;
-
+public class PaymentSbpCallback implements Callback {
+    private final UserStateRepository userStateRepository;
     @Override
     public CallbackName getCallback() {
-        return callbackName;
+        return CallbackName.PAYMENT_SBP;
     }
 
     @Override
@@ -33,37 +31,25 @@ public class BalanceCallback implements Callback {
         int messageId = callbackQuery.getMessage().getMessageId();
         long userId = callbackQuery.getFrom().getId();
 
-        BotUser botUser = userService.getUser(userId);
-        String balance = botUser.getBalance().toString();
-
-        EditMessageText editMessage = EditMessageText.builder()
+        userStateRepository.put(userId, DialogStageName.SBP_PAY);
+        EditMessageText editMessageText = EditMessageText
+                .builder()
+                .text(MessageText.INPUT_SUM_PAYMENT.getMessageText())
                 .chatId(chatId)
                 .messageId(messageId)
-                .text(MessageText.BALANCE_MENU.getMessageText().formatted(balance))
-                .parseMode("HTML")
-                .replyMarkup(InlineKeyboardMarkup.builder()
+                .replyMarkup(InlineKeyboardMarkup
+                        .builder()
                         .keyboardRow(new InlineKeyboardRow(
-                                // TODO Operation History
-//                                InlineKeyboardButton.builder()
-//                                        .text(ButtonText.HISTORY.getText())
-//                                        .callbackData(CallbackName.HISTORY.getCallbackName())
-//                                        .build(),
-                                InlineKeyboardButton.builder()
-                                        .text(ButtonText.TOP_UP.getText())
-                                        .callbackData(CallbackName.TOP_UP.getCallbackName())
-                                        .build()
-                        ))
-                        .keyboardRow(new InlineKeyboardRow(
-                                InlineKeyboardButton.builder()
+                                InlineKeyboardButton
+                                        .builder()
                                         .text(ButtonText.BACK.getText())
-                                        .callbackData(CallbackName.BACK_TO_MENU.getCallbackName())
+                                        .callbackData(CallbackName.TOP_UP.getCallbackName())
                                         .build()
                         ))
                         .build())
                 .build();
-
         try {
-            telegramClient.execute(editMessage);
+            telegramClient.execute(editMessageText);
         } catch (TelegramApiException e) {
             e.printStackTrace();
         }

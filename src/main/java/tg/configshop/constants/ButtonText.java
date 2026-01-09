@@ -35,6 +35,10 @@ public enum ButtonText {
     EMPTY("⠀"),
     ACCEPT_RULES("✅ Принимаю"),
     DECLINE_RULES("❌ Отказаться"),
+    PAYMENT_METHOD_SBP("💠 СБП"),
+    PAYMENT_METHOD_CRYPTO("💎 Криптовалюта"),
+    PAY_ACTION("💳 Оплатить"),
+    CHECK_PAYMENT("🔄 Проверить оплату"),
     BACK_TO_MENU("🔙 В главное меню");
 
     private final String text;

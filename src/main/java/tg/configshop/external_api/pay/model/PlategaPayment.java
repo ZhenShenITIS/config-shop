@@ -27,6 +27,8 @@ public class PlategaPayment {
     private String redirect;
     private String returnUrl;
     private String paymentDetails;
+    private Double amount;
+    private String currency;
     @Enumerated(EnumType.STRING)
     private PaymentStatus status;
     private Double usdtRate;
