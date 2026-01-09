@@ -3,8 +3,10 @@ package tg.configshop.services;
 import org.springframework.data.domain.Page;
 import tg.configshop.dto.ReferralWithProfit;
 import tg.configshop.model.BotUser;
+import tg.configshop.model.Referral;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface ReferralService {
     void createReferral (Long referrerId, Long referralId);
@@ -15,6 +17,7 @@ public interface ReferralService {
     String getReferralPromoCode (Long userId);
     List<BotUser> getAllReferrals (Long userId);
     Page<ReferralWithProfit> getReferralsWithProfit (Long userId, int pageNumber);
+    Optional<Long> getReferrerId (Long userId);
 
 
 }

@@ -3,11 +3,13 @@ package tg.configshop.services.impl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tg.configshop.constants.MessageText;
 import tg.configshop.constants.PaymentResult;
 import tg.configshop.constants.TopUpSource;
+import tg.configshop.events.PaymentConfirmedEvent;
 import tg.configshop.external_api.pay.PlategaClient;
 import tg.configshop.external_api.pay.constants.PaymentStatus;
 import tg.configshop.external_api.pay.dto.CreatePaymentRequest;
@@ -28,6 +30,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final PlategaPaymentRepository paymentRepository;
     private final UserService userService;
     private final TopUpRepository topUpRepository;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     @Value("${TELEGRAM_BOT_USERNAME}")
     private String telegramBotUsername;
@@ -88,6 +91,7 @@ public class PaymentServiceImpl implements PaymentService {
 
                 userService.addToBalance(userId, amount);
                 saveTopUpHistory(userId, amount, paymentId);
+                applicationEventPublisher.publishEvent(new PaymentConfirmedEvent(this, userId, amount));
 
                 return PaymentResult.CONFIRMED;
             } else if (remoteStatus == PaymentStatus.CANCELED) {

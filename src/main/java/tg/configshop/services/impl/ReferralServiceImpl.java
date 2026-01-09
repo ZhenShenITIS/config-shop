@@ -5,7 +5,6 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tg.configshop.constants.TopUpSource;
@@ -94,5 +93,14 @@ public class ReferralServiceImpl implements ReferralService {
     public Page<ReferralWithProfit> getReferralsWithProfit(Long userId, int pageNumber) {
         Pageable page = PageRequest.of(pageNumber, REFERRAL_PAGE_SIZE);
         return referralRepository.getReferralsWithProfit(userId, page);
+    }
+
+    @Override
+    public Optional<Long> getReferrerId(Long userId) {
+        Referral referral = referralRepository.findByReferral_Id(userId).orElse(null);
+        if (referral != null) {
+            return Optional.of(referral.getReferrer().getId());
+        }
+        return Optional.empty();
     }
 }

@@ -51,6 +51,8 @@ public class SubscriptionCallback implements Callback {
         double usedTrafficGb = remoteUser.userTraffic().usedTrafficBytes() / (1024.0 * 1024 * 1024);
         double limitTrafficGb = remoteUser.trafficLimitBytes() / (1024.0 * 1024 * 1024);
 
+        userService.syncRemnawaveUserWithLocalUser(remoteUser, botUser);
+
         String devicesText;
         if (devices.isEmpty()) {
             devicesText = MessageText.EMPTY_DEVICES.getMessageText();
@@ -73,7 +75,7 @@ public class SubscriptionCallback implements Callback {
                 devices.size(), maxDevices,
                 devicesText,
                 subLink, subLink
-        );
+        ).replace("/ 0.00", "/ ∞");
 
 
         InlineKeyboardMarkup markup = InlineKeyboardMarkup.builder()
