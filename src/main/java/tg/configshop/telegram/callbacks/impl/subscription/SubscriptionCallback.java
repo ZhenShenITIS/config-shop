@@ -19,6 +19,7 @@ import tg.configshop.model.BotUser;
 import tg.configshop.services.UserService;
 import tg.configshop.telegram.callbacks.Callback;
 import tg.configshop.util.DateUtil;
+import tg.configshop.util.RsaEncryptor;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -33,6 +34,9 @@ public class SubscriptionCallback implements Callback {
     @Value("${CONFIG_PANEL_SUB_URL}")
     private String subUrl;
 
+    @Value("${INSTRUCTION_URL}")
+    private String instructionUrl;
+
     @Override
     public CallbackName getCallback() {
         return callbackName;
@@ -43,7 +47,7 @@ public class SubscriptionCallback implements Callback {
         Long userId = callbackQuery.getFrom().getId();
         BotUser botUser = userService.getUser(userId);
 
-
+        // TODO refactor from "client -> view" to "client -> service -> view"
         List<Device> devices = remnawaveClient.getUserDevices(botUser.getRemnawaveUuid());
         RemnawaveUserResponse remoteUser = remnawaveClient.getUser(botUser.getRemnawaveUuid());
         int maxDevices = remoteUser.hwidDeviceLimit();
@@ -65,7 +69,12 @@ public class SubscriptionCallback implements Callback {
         String statusEmoji = DateUtil.isExpired(botUser) ? "🔴" : "🟢";
         String dateEnd = DateUtil.getDateEndSubscription(botUser);
         long daysLeft = DateUtil.getDaysLeft(botUser);
-        String subLink = subUrl + "/" + botUser.getShortId();
+        String subLink = null;
+        try {
+            subLink = RsaEncryptor.encryptAndBuildLink(subUrl + "/" + botUser.getShortId());
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
 
         String text = MessageText.SUBSCRIPTION.getMessageText().formatted(
                 callbackQuery.getFrom().getFirstName(),
@@ -74,15 +83,15 @@ public class SubscriptionCallback implements Callback {
                 usedTrafficGb, limitTrafficGb,
                 devices.size(), maxDevices,
                 devicesText,
-                subLink, subLink
+                subLink
         ).replace("/ 0.00", "/ ∞");
 
 
         InlineKeyboardMarkup markup = InlineKeyboardMarkup.builder()
                 .keyboardRow(new InlineKeyboardRow(
                         InlineKeyboardButton.builder()
-                                .text(ButtonText.CONNECT.getText())
-                                .url(subLink)
+                                .text(ButtonText.INSTRUCTION.getText())
+                                .url(instructionUrl)
                                 .build()
                 ))
                 .keyboardRow(new InlineKeyboardRow(

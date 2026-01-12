@@ -12,6 +12,7 @@ public enum ButtonText {
     SUPPORT("👨‍🔧 Поддержка"),
     SUBSCRIPTION("\uD83D\uDCC4 Подписка"), // 📄
     CONNECT("🔗 Подключиться"),
+    INSTRUCTION("📑 Инструкция"),
     HISTORY("📜 История операций"),
     TOP_UP("💳 Пополнить"),
     BACK("🔙 Назад"),
