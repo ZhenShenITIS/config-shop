@@ -14,6 +14,7 @@ import tg.configshop.constants.ButtonText;
 import tg.configshop.constants.CallbackName;
 import tg.configshop.constants.MessageText;
 import tg.configshop.dto.ReferralWithProfit;
+import tg.configshop.dto.ReferralWithProfitAndLevel;
 import tg.configshop.model.BotUser;
 import tg.configshop.services.ReferralService;
 import tg.configshop.telegram.callbacks.Callback;
@@ -53,7 +54,7 @@ public class RefListCallback implements Callback {
         }
 
 
-        Page<ReferralWithProfit> page = referralService.getReferralsWithProfit(userId, pageNumber);
+        Page<ReferralWithProfitAndLevel> page = referralService.getReferralsWithProfitAndLevel(userId, pageNumber);
 
         String text;
         List<InlineKeyboardRow> rows = new ArrayList<>();
@@ -68,7 +69,7 @@ public class RefListCallback implements Callback {
 
             sb.append(MessageText.REFERRAL_LIST.getMessageText()).append("\n");
 
-            for (ReferralWithProfit item : page.getContent()) {
+            for (ReferralWithProfitAndLevel item : page.getContent()) {
                 BotUser ref = item.botUser();
 
                 String template = DateUtil.isExpired(ref)
@@ -79,7 +80,7 @@ public class RefListCallback implements Callback {
 
                 String name = ref.getFirstName();
 
-                sb.append(String.format(template, name, item.profit(), dateStr)).append("\n\n");
+                sb.append(String.format(template, name, item.lvl(), item.profit(), dateStr)).append("\n\n");
             }
             text = sb.toString();
 

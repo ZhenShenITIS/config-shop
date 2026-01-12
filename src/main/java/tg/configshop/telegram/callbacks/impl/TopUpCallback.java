@@ -39,12 +39,12 @@ public class TopUpCallback implements Callback {
                         .callbackData(CallbackName.PAYMENT_SBP.getCallbackName())
                         .build()
         ));
-        rows.add(new InlineKeyboardRow(
-                InlineKeyboardButton.builder()
-                        .text(ButtonText.PAYMENT_METHOD_CRYPTO.getText())
-                        .callbackData(CallbackName.PAYMENT_CRYPTO.getCallbackName())
-                        .build()
-        ));
+//        rows.add(new InlineKeyboardRow(
+//                InlineKeyboardButton.builder()
+//                        .text(ButtonText.PAYMENT_METHOD_CRYPTO.getText())
+//                        .callbackData(CallbackName.PAYMENT_CRYPTO.getCallbackName())
+//                        .build()
+//        ));
         rows.add(new InlineKeyboardRow(
                 InlineKeyboardButton.builder()
                         .text(ButtonText.BACK.getText())

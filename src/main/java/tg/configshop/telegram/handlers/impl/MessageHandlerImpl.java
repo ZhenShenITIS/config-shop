@@ -26,14 +26,27 @@ public class MessageHandlerImpl implements MessageHandler {
     @Override
     public void answerMessage(Message message, TelegramClient telegramClient) {
         DialogStageName stage = userStateRepository.get(message.getFrom().getId());
+
         if (!stage.equals(DialogStageName.NONE)) {
-            dialogStateContainer.retrieveDialogStage(stage.getDialogStageName()).answerMessage(message, telegramClient);
-        } else if (message.hasText()) {
-            if (message.getText().startsWith("/")) {
-                String commandIdentifier = message.getText().split(" ")[0].split("\n")[0].split(telegramConfig.getBotName())[0].toLowerCase();
-                commandContainer.retrieveCommand(commandIdentifier).handleCommand(message, telegramClient);
+            dialogStateContainer.retrieveDialogStage(stage.getDialogStageName())
+                    .answerMessage(message, telegramClient);
+        } else {
+            boolean hasText = message.hasText();
+            boolean hasCaption = message.hasCaption();
+
+            if (hasText || hasCaption) {
+                String text = hasText ? message.getText() : message.getCaption();
+
+                if (text.startsWith("/")) {
+                    String commandIdentifier = text.split(" ")[0]
+                            .split("\n")[0]
+                            .split(telegramConfig.getBotName())[0]
+                            .toLowerCase();
+
+                    commandContainer.retrieveCommand(commandIdentifier)
+                            .handleCommand(message, telegramClient);
+                }
             }
         }
-
     }
 }

@@ -27,6 +27,9 @@ public class ReferralCallback implements Callback {
     @Value("${TELEGRAM_BOT_USERNAME}")
     private String botUsername;
 
+    @Value("${SUPPORT_USERNAME}")
+    private String supportUsername;
+
     @Override
     public CallbackName getCallback() {
         return callbackName;
@@ -41,6 +44,7 @@ public class ReferralCallback implements Callback {
         int allCount = referralService.getAllReferralCount(userId);
         int activeCount = referralService.getActiveReferralCount(userId);
         long profit = referralService.getAllProfit(userId);
+        long available = referralService.getAvailableSumToWithdraw(userId);
         String promoCode = referralService.getReferralPromoCode(userId);
         BotUser botUser = userService.getUser(userId);
 
@@ -56,6 +60,7 @@ public class ReferralCallback implements Callback {
                 allCount,
                 activeCount,
                 profit,
+                available,
                 promoCode,
                 lvl1,
                 lvl2,
@@ -72,7 +77,9 @@ public class ReferralCallback implements Callback {
                                 .build(),
                         InlineKeyboardButton.builder()
                                 .text(ButtonText.WITHDRAW.getText())
-                                .callbackData(CallbackName.WITHDRAW.getCallbackName())
+                                .url("t.me/" + supportUsername)
+                                // TODO
+                                //.callbackData(CallbackName.WITHDRAW.getCallbackName())
                                 .build()
                 ))
                 .keyboardRow(new InlineKeyboardRow(

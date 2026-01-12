@@ -44,6 +44,8 @@ public enum CallbackName {
 
     CHECK_STATUS_SBP("check_sbp"),
 
+    CRYPTO_WITHDRAWAL("crpt_with"),
+
     BACK_TO_MENU("back");
 
     private final String callbackName;

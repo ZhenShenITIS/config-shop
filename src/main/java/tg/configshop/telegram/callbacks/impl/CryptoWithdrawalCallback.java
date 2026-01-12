@@ -1,6 +1,8 @@
 package tg.configshop.telegram.callbacks.impl;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
@@ -10,39 +12,42 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 import tg.configshop.constants.ButtonText;
 import tg.configshop.constants.CallbackName;
+import tg.configshop.constants.DialogStageName;
 import tg.configshop.constants.MessageText;
+import tg.configshop.repositories.UserStateRepository;
+import tg.configshop.services.ReferralService;
 import tg.configshop.telegram.callbacks.Callback;
 
 import java.util.ArrayList;
 import java.util.List;
 
 @Component
-public class WithdrawalCallback implements Callback {
+@RequiredArgsConstructor
+public class CryptoWithdrawalCallback implements Callback {
+    private final ReferralService referralService;
+    private final UserStateRepository userStateRepository;
+
     @Override
     public CallbackName getCallback() {
-        return CallbackName.WITHDRAW;
+        return CallbackName.CRYPTO_WITHDRAWAL;
     }
 
     @Override
     public void processCallback(CallbackQuery callbackQuery, TelegramClient telegramClient) {
         long chatId = callbackQuery.getMessage().getChatId();
         int messageId = callbackQuery.getMessage().getMessageId();
+        long userId = callbackQuery.getFrom().getId();
+
+        long availableBalance = referralService.getAvailableSumToWithdraw(userId);
 
         List<InlineKeyboardRow> keyboard = new ArrayList<>();
 
-        InlineKeyboardRow row1 = new InlineKeyboardRow();
-        row1.add(InlineKeyboardButton.builder()
-                .text(ButtonText.PAYMENT_METHOD_CRYPTO.getText())
-                .callbackData(CallbackName.CRYPTO_WITHDRAWAL.getCallbackName())
-                .build());
-        keyboard.add(row1);
-
-        InlineKeyboardRow row2 = new InlineKeyboardRow();
-        row2.add(InlineKeyboardButton.builder()
+        InlineKeyboardRow row = new InlineKeyboardRow();
+        row.add(InlineKeyboardButton.builder()
                 .text(ButtonText.BACK.getText())
-                .callbackData(CallbackName.REFERRAL.getCallbackName())
+                .callbackData(CallbackName.WITHDRAW.getCallbackName())
                 .build());
-        keyboard.add(row2);
+        keyboard.add(row);
 
         InlineKeyboardMarkup markup = InlineKeyboardMarkup.builder()
                 .keyboard(keyboard)
@@ -50,16 +55,18 @@ public class WithdrawalCallback implements Callback {
 
         EditMessageText message = EditMessageText.builder()
                 .chatId(chatId)
-                .text(MessageText.WITHDRAWAL_METHOD.getMessageText())
+                .text(String.format(MessageText.CRYPTO_WITHDRAWAL_INPUT.getMessageText(), availableBalance))
                 .replyMarkup(markup)
-                .messageId(messageId)
                 .parseMode("HTML")
+                .messageId(messageId)
                 .build();
+
 
         try {
             telegramClient.execute(message);
         } catch (TelegramApiException e) {
             e.printStackTrace();
         }
+        userStateRepository.put(userId, DialogStageName.CRYPTO_WITHDRAW_SUM);
     }
 }

@@ -43,11 +43,6 @@ public class Withdrawal {
     private WithdrawalType type;
     private String requisites;
 
-
-
-
-
-
     public String getPublicId() {
         return TSID.from(id).toString();
     }
