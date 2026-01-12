@@ -33,7 +33,7 @@ public class SbpPayStage implements DialogStage {
     private final PaymentService paymentService;
 
     public static final String PAYLOAD_SEPARATOR = ":";
-    public static final long MIN_PAY_AMOUNT = 10;
+    public static final long MIN_PAY_AMOUNT = 100;
     public static final long MAX_PAY_AMOUNT = 10000;
 
 
