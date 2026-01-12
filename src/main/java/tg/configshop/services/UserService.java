@@ -10,4 +10,5 @@ public interface UserService {
     List<BotUser> getUser (String username);
     void addToBalance(Long userId, Long amountToAdd);
     void syncRemnawaveUserWithLocalUser (RemnawaveUserResponse userResponse, BotUser botUser);
+    List<BotUser> getAllUsers();
 }

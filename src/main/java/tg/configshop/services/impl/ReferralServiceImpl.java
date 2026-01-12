@@ -8,7 +8,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tg.configshop.constants.TopUpSource;
+import tg.configshop.dto.ReferralView;
 import tg.configshop.dto.ReferralWithProfit;
+import tg.configshop.dto.ReferralWithProfitAndLevel;
 import tg.configshop.events.ReferralCreatedEvent;
 import tg.configshop.model.BotUser;
 import tg.configshop.model.PromoCode;
@@ -17,20 +19,28 @@ import tg.configshop.repositories.BotUserRepository;
 import tg.configshop.repositories.PromoCodeRepository;
 import tg.configshop.repositories.ReferralRepository;
 import tg.configshop.repositories.TopUpRepository;
+import tg.configshop.repositories.WithdrawalRepository;
 import tg.configshop.services.ReferralService;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+// TODO decompose god-service
 public class ReferralServiceImpl implements ReferralService {
     private final ReferralRepository referralRepository;
     private final BotUserRepository botUserRepository;
     private final PromoCodeRepository promoCodeRepository;
     private final TopUpRepository topUpRepository;
     private final ApplicationEventPublisher eventPublisher;
+
+
+    private final WithdrawalRepository withdrawalRepository;
 
     private final String PROMO_CODE_PREFIX = "REF_";
     private final long REFERRAL_PROMO_CODE_BASE_AMOUNT = 100L;
@@ -85,14 +95,37 @@ public class ReferralServiceImpl implements ReferralService {
     }
 
     @Override
-    public List<BotUser> getAllReferrals(Long userId) {
-        return referralRepository.findAllByReferrer(botUserRepository.getReferenceById(userId));
+    public Long getAvailableSumToWithdraw(Long userId) {
+        Long totalReferralEarnings = topUpRepository.getSumByUserIdAndSource(userId, TopUpSource.REFERRAL);
+        Long totalWithdrawnOrPending = withdrawalRepository.sumConsumedReferralBalance(userId);
+        long theoreticalReferralBalance = Math.max(0, totalReferralEarnings - totalWithdrawnOrPending);
+
+        Long currentWalletBalance = botUserRepository.findById(userId)
+                .map(BotUser::getBalance)
+                .orElse(0L);
+        return Math.min(theoreticalReferralBalance, currentWalletBalance);
     }
 
     @Override
-    public Page<ReferralWithProfit> getReferralsWithProfit(Long userId, int pageNumber) {
-        Pageable page = PageRequest.of(pageNumber, REFERRAL_PAGE_SIZE);
-        return referralRepository.getReferralsWithProfit(userId, page);
+    public Page<ReferralWithProfitAndLevel> getReferralsWithProfitAndLevel(Long userId, int pageNumber) {
+        Pageable pageable = PageRequest.of(pageNumber, REFERRAL_PAGE_SIZE);
+
+        Page<ReferralView> viewPage = referralRepository.findReferralsProjection(userId, pageable);
+
+        return viewPage.map(view -> {
+            BotUser tempUser = BotUser.builder()
+                    .id(view.getUserId())
+                    .firstName(view.getFirstName())
+                    .expireAt(view.getExpireAt())
+                    .build();
+
+            return new ReferralWithProfitAndLevel(
+                    tempUser,
+                    view.getProfit(),
+                    view.getReferredAt(),
+                    view.getLvl()
+            );
+        });
     }
 
     @Override

@@ -2,6 +2,7 @@ package tg.configshop.services;
 
 import org.springframework.data.domain.Page;
 import tg.configshop.dto.ReferralWithProfit;
+import tg.configshop.dto.ReferralWithProfitAndLevel;
 import tg.configshop.model.BotUser;
 import tg.configshop.model.Referral;
 
@@ -15,9 +16,9 @@ public interface ReferralService {
     int getActiveReferralCount (Long userId);
     long getAllProfit (Long userId);
     String getReferralPromoCode (Long userId);
-    List<BotUser> getAllReferrals (Long userId);
-    Page<ReferralWithProfit> getReferralsWithProfit (Long userId, int pageNumber);
     Optional<Long> getReferrerId (Long userId);
+    Long getAvailableSumToWithdraw(Long userId);
+    Page<ReferralWithProfitAndLevel> getReferralsWithProfitAndLevel (Long userId, int pageNumber);
 
 
 }

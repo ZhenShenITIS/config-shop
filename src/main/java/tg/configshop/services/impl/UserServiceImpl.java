@@ -26,6 +26,11 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public List<BotUser> getAllUsers() {
+        return botUserRepository.findAll();
+    }
+
+    @Override
     public void syncRemnawaveUserWithLocalUser(RemnawaveUserResponse userResponse, BotUser botUser) {
         botUser.setExpireAt(userResponse.expireAt());
         botUserRepository.save(botUser);
