@@ -37,6 +37,7 @@ public class PaymentSbpCallback implements Callback {
                 .text(MessageText.INPUT_SUM_PAYMENT.getMessageText())
                 .chatId(chatId)
                 .messageId(messageId)
+                .parseMode("HTML")
                 .replyMarkup(InlineKeyboardMarkup
                         .builder()
                         .keyboardRow(new InlineKeyboardRow(
