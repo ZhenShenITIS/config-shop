@@ -78,6 +78,7 @@ public class SubscriptionCallback implements Callback {
 
         String text = MessageText.SUBSCRIPTION.getMessageText().formatted(
                 callbackQuery.getFrom().getFirstName(),
+                botUser.getId(),
                 botUser.getBalance(),
                 statusEmoji, dateEnd, daysLeft,
                 usedTrafficGb, limitTrafficGb,
