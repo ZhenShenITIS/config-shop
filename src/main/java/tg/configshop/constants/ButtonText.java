@@ -20,6 +20,7 @@ public enum ButtonText {
     REF_ANALYTICS("📈 Аналитика"),
     WITHDRAW("📤 Вывод"),
     BUY_SUB("💳 Продлить / Купить"),
+    DEVICES("📱 Устройства"),
     SUB_PERIOD_1_MONTH("📅 1 месяц — %d ₽"),
     SUB_PERIOD_3_MONTH("📅 3 месяца — %d ₽"),
     SUB_PERIOD_6_MONTH("📅 6 месяцев — %d ₽"),
@@ -40,6 +41,8 @@ public enum ButtonText {
     PAYMENT_METHOD_CRYPTO("💎 Криптовалюта"),
     PAY_ACTION("💳 Оплатить"),
     CHECK_PAYMENT("🔄 Проверить оплату"),
+    DELETE_DEVICES("🗑️ Удалить устройства"),
+    BUY_MORE_DEVICES("➕ Докупить устройства"),
     BACK_TO_MENU("🔙 В главное меню");
 
     private final String text;

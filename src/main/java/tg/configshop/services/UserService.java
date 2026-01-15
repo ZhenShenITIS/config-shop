@@ -11,4 +11,5 @@ public interface UserService {
     void addToBalance(Long userId, Long amountToAdd);
     void syncRemnawaveUserWithLocalUser (RemnawaveUserResponse userResponse, BotUser botUser);
     List<BotUser> getAllUsers();
+    void decreaseBalance(Long userId, Long amountToDecrease);
 }

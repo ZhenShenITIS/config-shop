@@ -46,6 +46,13 @@ public enum CallbackName {
 
     CRYPTO_WITHDRAWAL("crpt_with"),
 
+    DEVICES("devices"),
+    DELETE_DEVICES("delete_devices"),
+    BUY_MORE_DEVICES("buy_more_devices"),
+    CONFIRM_DEVICE_PURCHASE("confirm_dev_pur"),
+    PREVIEW_DEVICE_PURCHASE("preview_device_purchase"),
+    CANCEL_DEVICE_PURCHASE("cancel_device_purchase"),
+
     BACK_TO_MENU("back");
 
     private final String callbackName;

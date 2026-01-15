@@ -3,6 +3,7 @@ package tg.configshop.services.impl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tg.configshop.exceptions.subscription.InsufficientBalanceException;
 import tg.configshop.external_api.remnawave.dto.user.RemnawaveUserResponse;
 import tg.configshop.model.BotUser;
 import tg.configshop.repositories.BotUserRepository;
@@ -23,6 +24,16 @@ public class UserServiceImpl implements UserService {
     @Override
     public List<BotUser> getUser(String username) {
         return botUserRepository.findByUsernameIgnoreCase(username);
+    }
+
+    @Override
+    public void decreaseBalance(Long userId, Long amount) throws InsufficientBalanceException {
+        BotUser user = getUser(userId);
+        if (user.getBalance() < amount) {
+            throw new InsufficientBalanceException("Insufficient balance");
+        }
+        user.setBalance(user.getBalance() - amount);
+        botUserRepository.save(user);
     }
 
     @Override

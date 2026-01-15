@@ -3,6 +3,8 @@ package tg.configshop.external_api.remnawave;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import tg.configshop.external_api.remnawave.dto.device.AddDeviceRequest;
+import tg.configshop.external_api.remnawave.dto.device.DeleteDeviceRequest;
 import tg.configshop.external_api.remnawave.dto.device.Device;
 import tg.configshop.external_api.remnawave.dto.device.DeviceRootResponse;
 import tg.configshop.external_api.remnawave.dto.squads.InternalSquad;
@@ -62,6 +64,25 @@ public class RemnawaveClientImpl implements RemnawaveClient {
                 .body(DeviceRootResponse.class)
                 .response()
                 .devices();
+    }
+
+    @Override
+    public void deleteDevice(String uuid, String hwid) {
+        remnawaveRestClient.post()
+                .uri("/api/hwid/devices/delete")
+                .body(new DeleteDeviceRequest(uuid, hwid))
+                .retrieve()
+                .toBodilessEntity();
+
+    }
+
+    @Override
+    public void updateDeviceCount(String uuid, int countDevices) {
+        remnawaveRestClient.patch()
+                .uri("/api/users")
+                .body(new AddDeviceRequest(countDevices, uuid))
+                .retrieve()
+                .toBodilessEntity();
     }
 
     private List<String> getInternalSquads() {

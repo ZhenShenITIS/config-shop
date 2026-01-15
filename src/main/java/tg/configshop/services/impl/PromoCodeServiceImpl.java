@@ -107,7 +107,7 @@ public class PromoCodeServiceImpl implements PromoCodeService {
             referralService.createReferral(promoCode.getReferrer().getId(), botUser.getId());
         }
     }
-
+    
     private void usePromoCode (PromoCode promoCode, BotUser user) {
 
         increaseUserBalance(promoCode, user);
