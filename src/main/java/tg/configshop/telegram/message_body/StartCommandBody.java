@@ -55,13 +55,13 @@ public class StartCommandBody {
 
         InlineKeyboardMarkup keyboard = InlineKeyboardMarkup
                 .builder()
-                .keyboardRow(new InlineKeyboardRow(
-                        InlineKeyboardButton
-                                .builder()
-                                .text(ButtonText.CONNECT.getText())
-                                .url(subUrl+"/"+botUser.getShortId())
-                                .build()
-                ))
+//                .keyboardRow(new InlineKeyboardRow(
+//                        InlineKeyboardButton
+//                                .builder()
+//                                .text(ButtonText.CONNECT.getText())
+//                                .url(subUrl+"/"+botUser.getShortId())
+//                                .build()
+//                ))
                 .keyboardRow(new InlineKeyboardRow(
                         InlineKeyboardButton
                                 .builder()

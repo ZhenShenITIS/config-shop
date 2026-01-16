@@ -6,54 +6,54 @@ import lombok.Getter;
 @AllArgsConstructor
 @Getter
 public enum CallbackName {
-    NONE("none"),
+    NONE("0"),
     // start-menu
-    BALANCE("balance"),
-    SUBSCRIPTION("subscription"),
-    PROMO_CODE("promo_code"),
-    REFERRAL("referral"),
+    BALANCE("1"),
+    SUBSCRIPTION("2"),
+    PROMO_CODE("3"),
+    REFERRAL("4"),
 
     // balance
-    HISTORY("history"),
-    TOP_UP("top_up"),
+    HISTORY("5"),
+    TOP_UP("6"),
 
     // referral
-    REF_LIST("ref_list"),
-    REF_ANALYTICS("ref_analytics"),
+    REF_LIST("7"),
+    REF_ANALYTICS("8"),
 
-    BUY_SUB_MENU("buy_sub_menu"),
+    BUY_SUB_MENU("9"),
 
-    WITHDRAW("withdraw"),
+    WITHDRAW("a"),
 
-    BUY_PERIOD_30("buy_period_30"),
-    BUY_PERIOD_90("buy_period_90"),
-    BUY_PERIOD_180("buy_period_180"),
-    BUY_PERIOD_360("buy_period_360"),
+    BUY_PERIOD_30("b"),
+    BUY_PERIOD_90("c"),
+    BUY_PERIOD_180("d"),
+    BUY_PERIOD_360("e"),
 
-    CONFIRM_BUY("confirm_buy"),
+    CONFIRM_BUY("f"),
 
-    PURCHASE("pay"),
+    PURCHASE("g"),
 
-    DOCS_CONFIRM("docs_confirm"),
+    DOCS_CONFIRM("h"),
 
-    DOCS_INFO("docs_info"),
+    DOCS_INFO("k"),
 
-    DOCS_DECLINE("docs_decline"),
-    PAYMENT_SBP("payment_sbp"),
-    PAYMENT_CRYPTO("payment_crypto"),
+    DOCS_DECLINE("l"),
+    PAYMENT_SBP("m"),
+    PAYMENT_CRYPTO("n"),
 
-    CHECK_STATUS_SBP("check_sbp"),
+    CHECK_STATUS_SBP("o"),
 
-    CRYPTO_WITHDRAWAL("crpt_with"),
+    CRYPTO_WITHDRAWAL("p"),
 
-    DEVICES("devices"),
-    DELETE_DEVICES("delete_devices"),
-    BUY_MORE_DEVICES("buy_more_devices"),
-    CONFIRM_DEVICE_PURCHASE("confirm_dev_pur"),
-    PREVIEW_DEVICE_PURCHASE("preview_device_purchase"),
-    CANCEL_DEVICE_PURCHASE("cancel_device_purchase"),
+    DEVICES("q"),
+    DELETE_DEVICES("r"),
+    BUY_MORE_DEVICES("s"),
+    CONFIRM_DEVICE_PURCHASE("t"),
+    PREVIEW_DEVICE_PURCHASE("j"),
+    CANCEL_DEVICE_PURCHASE("x"),
 
-    BACK_TO_MENU("back");
+    BACK_TO_MENU("y");
 
     private final String callbackName;
 
