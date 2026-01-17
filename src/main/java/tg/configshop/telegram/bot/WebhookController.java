@@ -10,7 +10,7 @@ import org.telegram.telegrambots.meta.api.objects.Update;
 
 @RestController
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "START_WEBHOOK", havingValue = "true")
+@ConditionalOnProperty(name = "start.webhook", havingValue = "true")
 public class WebhookController {
     private final WebhookBot webhookBot;
 

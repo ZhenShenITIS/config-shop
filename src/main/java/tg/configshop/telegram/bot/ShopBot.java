@@ -16,7 +16,7 @@ import tg.configshop.telegram.handlers.MessageHandler;
 
 @Component
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "START_WEBHOOK", havingValue = "false", matchIfMissing = true)
+@ConditionalOnProperty(name = "start.webhook", havingValue = "false", matchIfMissing = true)
 public class ShopBot implements SpringLongPollingBot, LongPollingSingleThreadUpdateConsumer {
 
     private final TelegramClient telegramClient;

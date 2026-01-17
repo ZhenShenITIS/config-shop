@@ -10,7 +10,7 @@ import tg.configshop.telegram.handlers.MessageHandler;
 
 @Component
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "START_WEBHOOK", havingValue = "true")
+@ConditionalOnProperty(name = "start.webhook", havingValue = "true")
 public class WebhookBot {
 
     private final CallbackQueryHandler callbackQueryHandler;

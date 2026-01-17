@@ -10,7 +10,7 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 @Configuration
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "START_WEBHOOK", havingValue = "true")
+@ConditionalOnProperty(name = "start.webhook", havingValue = "true")
 public class WebhookConfig {
 
     private final TelegramConfig telegramConfig;
