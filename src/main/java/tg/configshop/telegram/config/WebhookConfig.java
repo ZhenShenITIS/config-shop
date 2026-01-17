@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Configuration;
 import org.telegram.telegrambots.client.okhttp.OkHttpTelegramClient;
+import org.telegram.telegrambots.meta.api.methods.updates.GetWebhookInfo;
 import org.telegram.telegrambots.meta.api.methods.updates.SetWebhook;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
@@ -18,20 +19,30 @@ public class WebhookConfig {
     @PostConstruct
     public void registerWebhook() {
         try {
-            String webhookUrl = telegramConfig.getWebhookUrl() + "/webhook";
+            String fullWebhookUrl = telegramConfig.getWebhookUrl() + "/webhook";
 
             OkHttpTelegramClient client = new OkHttpTelegramClient(
                     telegramConfig.getBotToken()
             );
 
             SetWebhook setWebhook = SetWebhook.builder()
-                    .url(webhookUrl)
+                    .url(fullWebhookUrl)
                     .build();
 
-            client.execute(setWebhook);
+            Boolean result = client.execute(setWebhook);
 
-            System.out.println("Webhook registered: " + webhookUrl);
+            if (Boolean.TRUE.equals(result)) {
+                System.out.println("✅ Webhook registered successfully: " + fullWebhookUrl);
+            } else {
+                System.err.println("❌ Webhook registration FAILED: " + fullWebhookUrl);
+                System.err.println("Result: " + result);
+
+                String info = String.valueOf(client.execute(new GetWebhookInfo()));
+                System.err.println("Current webhook info: " + info);
+            }
         } catch (TelegramApiException e) {
+            System.err.println("❌ Exception during webhook registration:");
+            e.printStackTrace();
             throw new RuntimeException("Failed to register webhook", e);
         }
     }
