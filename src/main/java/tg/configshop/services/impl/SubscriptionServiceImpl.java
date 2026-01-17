@@ -1,6 +1,8 @@
 package tg.configshop.services.impl;
 
 import lombok.RequiredArgsConstructor;
+import org.quartz.Scheduler;
+import org.quartz.spi.JobFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -10,6 +12,7 @@ import tg.configshop.external_api.remnawave.RemnawaveClient;
 import tg.configshop.model.BotUser;
 import tg.configshop.model.Purchase;
 import tg.configshop.model.Subscription;
+import tg.configshop.quartz.services.SchedulerService;
 import tg.configshop.repositories.PurchaseRepository;
 import tg.configshop.repositories.SubscriptionRepository;
 import tg.configshop.services.SubscriptionService;
@@ -57,6 +60,9 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     @Value("${TRAFFIC_LIMIT_PER_DEVICE}")
     private int TRAFFIC_LIMIT_PER_DEVICE;
 
+
+    private final SchedulerService schedulerService;
+
     @Override
     @Transactional
     public void buySubscription(Long userId, Long subscriptionId) throws InsufficientBalanceException {
@@ -71,6 +77,9 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         updateSubscription(botUser, subscription, newExpired);
 
         savePurchase(botUser, subscription);
+
+        schedulerService.scheduleSubscriptionNotifications(botUser.getId(), newExpired);
+
 
     }
 

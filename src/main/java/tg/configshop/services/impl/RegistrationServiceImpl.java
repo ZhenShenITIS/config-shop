@@ -7,6 +7,7 @@ import org.telegram.telegrambots.meta.api.objects.message.Message;
 import tg.configshop.external_api.remnawave.RemnawaveClient;
 import tg.configshop.external_api.remnawave.dto.user.RemnawaveUserResponse;
 import tg.configshop.model.BotUser;
+import tg.configshop.quartz.services.SchedulerService;
 import tg.configshop.repositories.BotUserRepository;
 import tg.configshop.services.ReferralService;
 import tg.configshop.services.RegistrationService;
@@ -16,6 +17,7 @@ public class RegistrationServiceImpl implements RegistrationService {
     private final BotUserRepository botUserRepository;
     private final ReferralService referralService;
     private final RemnawaveClient remnawaveClient;
+    private final SchedulerService schedulerService;
 
     @Override
     public boolean isRegistered(Long userId) {
@@ -40,6 +42,7 @@ public class RegistrationServiceImpl implements RegistrationService {
             referralService.createReferral(referrerId, user.getId());
         }
         referralService.createReferralCode(user.getId());
+        schedulerService.scheduleTrialTrafficChecks(user.getId());
         return botUser;
     }
 
