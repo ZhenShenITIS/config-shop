@@ -38,7 +38,7 @@ public enum ButtonText {
     ACCEPT_RULES("✅ Принимаю"),
     DECLINE_RULES("❌ Отказаться"),
     PAYMENT_METHOD_SBP("💠 СБП"),
-    PAYMENT_METHOD_CARD("💳 Карта"),
+    PAYMENT_METHOD_CARD("💳 Карты МИР"),
     PAYMENT_METHOD_CRYPTO("💎 Криптовалюта"),
     PAY_ACTION("💳 Оплатить"),
     CHECK_PAYMENT("🔄 Проверить оплату"),
