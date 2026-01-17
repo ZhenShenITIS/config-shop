@@ -9,6 +9,7 @@ public enum CommandName {
     UNKNOWN("null"),
     FIND_USER("/find_user"),
     BROADCAST("/broadcast"),
+    SCHEDULE_NOTIFICATION("/schedule_notification"),
     START("/start");
 
 
