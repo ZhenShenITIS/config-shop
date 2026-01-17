@@ -12,7 +12,7 @@ services:
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
     restart: always
     ports:
-      - "127.0.0.1:${SERVER_PORT}:${SERVER_PORT}"
+      - "${SERVER_PORT}:${SERVER_PORT}"
 
   db:
     image: postgres:17-alpine
