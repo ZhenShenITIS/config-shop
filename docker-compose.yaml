@@ -13,7 +13,6 @@ services:
     restart: always
     ports:
       - "127.0.0.1:${SERVER_PORT}:${SERVER_PORT}"
-    network_mode: bridge
 
   db:
     image: postgres:17-alpine
