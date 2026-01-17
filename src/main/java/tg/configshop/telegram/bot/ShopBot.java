@@ -1,6 +1,7 @@
 package tg.configshop.telegram.bot;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.client.okhttp.OkHttpTelegramClient;
 import org.telegram.telegrambots.longpolling.interfaces.LongPollingUpdateConsumer;
@@ -15,6 +16,7 @@ import tg.configshop.telegram.handlers.MessageHandler;
 
 @Component
 @RequiredArgsConstructor
+@ConditionalOnProperty(name = "START_WEBHOOK", havingValue = "false", matchIfMissing = true)
 public class ShopBot implements SpringLongPollingBot, LongPollingSingleThreadUpdateConsumer {
 
     private final TelegramClient telegramClient;

@@ -14,9 +14,13 @@ import org.telegram.telegrambots.meta.generics.TelegramClient;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class TelegramConfig {
     @Value("${TELEGRAM_BOT_USERNAME}")
-    String botName;
+    private String botName;
     @Value("${TELEGRAM_BOT_TOKEN}")
-    String botToken;
+    private String botToken;
+    @Value("${START_WEBHOOK:false}")
+    private boolean webhookEnabled;
+    @Value("${TELEGRAM_WEBHOOK_URL}")
+    private String webhookUrl;
 
     @Bean
     public TelegramClient telegramClient () {

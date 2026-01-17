@@ -79,6 +79,12 @@
         </dependency>
 
         <dependency>
+            <groupId>org.telegram</groupId>
+            <artifactId>telegrambots-springboot-webhook-starter</artifactId>
+            <version>9.1.0</version>
+        </dependency>
+
+        <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
             <version>33.3.1-jre</version>
@@ -108,6 +114,8 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-quartz</artifactId>
         </dependency>
+
+
     </dependencies>
 
     <build>

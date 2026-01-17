@@ -29,7 +29,7 @@ public class TopUp {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private Long value;
-    // REFERRAL/CARD/PROMO_CODE
+    // REFERRAL/EXTERNAL/PROMO_CODE
     @Enumerated(EnumType.STRING)
     private TopUpSource topUpSource;
     @Builder.Default
