@@ -1,6 +1,8 @@
 package tg.configshop.config;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -42,6 +44,14 @@ public class SpringConfig {
         });
 
         mapper.registerModule(javaTimeModule);
+
+        mapper.findAndRegisterModules();
+
+        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+        mapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
+
+        mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
 
 
         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
