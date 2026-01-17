@@ -18,6 +18,7 @@ public class WebhookBot {
     private final TelegramClient telegramClient;
 
     public void processUpdate(Update update) {
+        System.out.println("🤖 Processing update: " + update);
         if (update.hasCallbackQuery()) {
             callbackQueryHandler.processCallbackQuery(
                     update.getCallbackQuery(),
