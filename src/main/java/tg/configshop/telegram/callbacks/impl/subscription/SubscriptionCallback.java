@@ -32,7 +32,6 @@ import java.util.stream.Collectors;
 public class SubscriptionCallback implements Callback {
     private final CallbackName callbackName = CallbackName.SUBSCRIPTION;
     private final UserService userService;
-    private final RemnawaveClient remnawaveClient;
     private final DeviceService deviceService;
     private final ExternalSubscriptionService externalSubscriptionService;
 

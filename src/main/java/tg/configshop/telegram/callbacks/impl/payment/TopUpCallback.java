@@ -1,7 +1,6 @@
-package tg.configshop.telegram.callbacks.impl;
+package tg.configshop.telegram.callbacks.impl.payment;
 
 import lombok.RequiredArgsConstructor;
-import lombok.SneakyThrows;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
@@ -13,6 +12,7 @@ import org.telegram.telegrambots.meta.generics.TelegramClient;
 import tg.configshop.constants.ButtonText;
 import tg.configshop.constants.CallbackName;
 import tg.configshop.constants.MessageText;
+import tg.configshop.external_api.pay.constants.PaymentMethod;
 import tg.configshop.telegram.callbacks.Callback;
 
 import java.util.ArrayList;
@@ -21,6 +21,8 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 public class TopUpCallback implements Callback {
+
+    private final String PAYLOAD_SEPARATOR = ":";
 
     @Override
     public CallbackName getCallback() {
@@ -36,7 +38,13 @@ public class TopUpCallback implements Callback {
         rows.add(new InlineKeyboardRow(
                 InlineKeyboardButton.builder()
                         .text(ButtonText.PAYMENT_METHOD_SBP.getText())
-                        .callbackData(CallbackName.PAYMENT_SBP.getCallbackName())
+                        .callbackData(CallbackName.PAYMENT_INPUT_SUM.getCallbackName() + PAYLOAD_SEPARATOR + PaymentMethod.SBP.getIntMethod())
+                        .build()
+        ));
+        rows.add(new InlineKeyboardRow(
+                InlineKeyboardButton.builder()
+                        .text(ButtonText.PAYMENT_METHOD_CARD.getText())
+                        .callbackData(CallbackName.PAYMENT_INPUT_SUM.getCallbackName() + PAYLOAD_SEPARATOR + PaymentMethod.CARD.getIntMethod())
                         .build()
         ));
 //        rows.add(new InlineKeyboardRow(

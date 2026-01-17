@@ -1,4 +1,4 @@
-package tg.configshop.telegram.callbacks.impl;
+package tg.configshop.telegram.callbacks.impl.payment;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -19,13 +19,13 @@ import tg.configshop.telegram.callbacks.Callback;
 
 @Component
 @RequiredArgsConstructor
-public class CheckStatusSbpCallback implements Callback {
+public class CheckStatusPaymentCallback implements Callback {
     public static final String PAYLOAD_SEPARATOR = ":";
     private final PaymentService paymentService;
 
     @Override
     public CallbackName getCallback() {
-        return CallbackName.CHECK_STATUS_SBP;
+        return CallbackName.CHECK_STATUS_PAYMENT;
     }
 
     @Override
@@ -67,6 +67,7 @@ public class CheckStatusSbpCallback implements Callback {
                 .builder()
                 .text(text)
                 .chatId(chatId)
+                .parseMode("HTML")
                 .replyMarkup(InlineKeyboardMarkup
                         .builder()
                         .keyboardRow(new InlineKeyboardRow(

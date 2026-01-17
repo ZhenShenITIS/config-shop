@@ -7,7 +7,7 @@ import lombok.Getter;
 @Getter
 public enum DialogStageName {
     PROMO_CODE_INPUT("promo_input"),
-    SBP_PAY("sbp_pay"),
+    PAYMENT("payment"),
     CRYPTO_WITHDRAW_SUM("crypto_wd_sum"),
     DEVICE_INPUT("device_input"),
     NONE("none");

@@ -15,11 +15,10 @@ import tg.configshop.constants.ButtonText;
 import tg.configshop.constants.CallbackName;
 import tg.configshop.constants.DialogStageName;
 import tg.configshop.constants.MessageText;
-import tg.configshop.external_api.pay.constants.PaymentMethod;
 import tg.configshop.external_api.pay.model.PlategaPayment;
 import tg.configshop.repositories.UserStateRepository;
 import tg.configshop.services.PaymentService;
-import tg.configshop.telegram.callbacks.impl.TopUpCallback;
+import tg.configshop.telegram.callbacks.impl.payment.TopUpCallback;
 import tg.configshop.telegram.dialogstages.DialogStage;
 
 import java.util.ArrayList;
@@ -27,7 +26,7 @@ import java.util.List;
 
 @Component
 @RequiredArgsConstructor
-public class SbpPayStage implements DialogStage {
+public class PaymentStage implements DialogStage {
     private final UserStateRepository stateRepository;
     private final TopUpCallback topUpCallback;
     private final PaymentService paymentService;
@@ -39,7 +38,7 @@ public class SbpPayStage implements DialogStage {
 
     @Override
     public DialogStageName getDialogStage() {
-        return DialogStageName.SBP_PAY;
+        return DialogStageName.PAYMENT;
     }
 
     @Override
@@ -78,11 +77,11 @@ public class SbpPayStage implements DialogStage {
             return;
         }
         stateRepository.put(userId, DialogStageName.NONE);
-        PlategaPayment plategaPayment = paymentService.createPlategaPayment(amount, PaymentMethod.SBP.getIntMethod(), userId);
+        PlategaPayment plategaPayment = paymentService.createPlategaPayment(amount, stateRepository.getPaymentContext(userId).paymentMethod().getIntMethod(), userId);
 
         String shortId = plategaPayment.getTransactionId().split("-")[0];
 
-        String text = String.format(MessageText.SBP_PAYMENT_INSTRUCTION.getMessageText(), amount, shortId);
+        String text = String.format(MessageText.PAYMENT_INSTRUCTION.getMessageText(), amount, shortId);
 
         List<InlineKeyboardRow> rows = new ArrayList<>();
 
@@ -92,7 +91,7 @@ public class SbpPayStage implements DialogStage {
                 .build();
         rows.add(new InlineKeyboardRow(payButton));
 
-        String checkPayload = CallbackName.CHECK_STATUS_SBP.getCallbackName()
+        String checkPayload = CallbackName.CHECK_STATUS_PAYMENT.getCallbackName()
                               + PAYLOAD_SEPARATOR
                               + plategaPayment.getTransactionId();
 

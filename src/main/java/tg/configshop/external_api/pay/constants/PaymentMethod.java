@@ -21,16 +21,23 @@ public enum PaymentMethod {
     private final String textMethod;
     private final int intMethod;
 
-    private static final Map<String, PaymentMethod> LOOKUP_MAP = new HashMap<>();
+    private static final Map<String, PaymentMethod> TEXT_MAP = new HashMap<>();
+    private static final Map<Integer, PaymentMethod> INT_MAP = new HashMap<>();
 
     static {
         for (PaymentMethod pm : values()) {
-            LOOKUP_MAP.put(pm.textMethod, pm);
+            TEXT_MAP.put(pm.textMethod, pm);
+            INT_MAP.put(pm.intMethod, pm);
         }
     }
     public static PaymentMethod fromTextMethod(String textMethod) {
-        return Optional.ofNullable(LOOKUP_MAP.get(textMethod))
+        return Optional.ofNullable(TEXT_MAP.get(textMethod))
                 .orElseThrow(() -> new IllegalArgumentException("Unknown payment method: " + textMethod));
+    }
+
+    public static PaymentMethod fromIntMethod(int intMethod) {
+        return Optional.ofNullable(INT_MAP.get(intMethod))
+                .orElseThrow(() -> new IllegalArgumentException("Unknown payment method: " + intMethod));
     }
 
     @JsonCreator

@@ -1,4 +1,4 @@
-package tg.configshop.telegram.callbacks.impl;
+package tg.configshop.telegram.callbacks.impl.payment;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -13,16 +13,18 @@ import tg.configshop.constants.ButtonText;
 import tg.configshop.constants.CallbackName;
 import tg.configshop.constants.DialogStageName;
 import tg.configshop.constants.MessageText;
+import tg.configshop.dto.PaymentContext;
+import tg.configshop.external_api.pay.constants.PaymentMethod;
 import tg.configshop.repositories.UserStateRepository;
 import tg.configshop.telegram.callbacks.Callback;
 
 @Component
 @RequiredArgsConstructor
-public class PaymentSbpCallback implements Callback {
+public class PaymentInputSumCallback implements Callback {
     private final UserStateRepository userStateRepository;
     @Override
     public CallbackName getCallback() {
-        return CallbackName.PAYMENT_SBP;
+        return CallbackName.PAYMENT_INPUT_SUM;
     }
 
     @Override
@@ -30,8 +32,11 @@ public class PaymentSbpCallback implements Callback {
         long chatId = callbackQuery.getMessage().getChatId();
         int messageId = callbackQuery.getMessage().getMessageId();
         long userId = callbackQuery.getFrom().getId();
+        int paymentMethod = Integer.parseInt(callbackQuery.getData().split(":")[1]);
 
-        userStateRepository.put(userId, DialogStageName.SBP_PAY);
+        userStateRepository.putPaymentContext(userId, new PaymentContext(PaymentMethod.fromIntMethod(paymentMethod)));
+
+        userStateRepository.put(userId, DialogStageName.PAYMENT);
         EditMessageText editMessageText = EditMessageText
                 .builder()
                 .text(MessageText.INPUT_SUM_PAYMENT.getMessageText())

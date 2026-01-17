@@ -39,10 +39,10 @@ public enum CallbackName {
     DOCS_INFO("k"),
 
     DOCS_DECLINE("l"),
-    PAYMENT_SBP("m"),
+    PAYMENT_INPUT_SUM("m"),
     PAYMENT_CRYPTO("n"),
 
-    CHECK_STATUS_SBP("o"),
+    CHECK_STATUS_PAYMENT("o"),
 
     CRYPTO_WITHDRAWAL("p"),
 
