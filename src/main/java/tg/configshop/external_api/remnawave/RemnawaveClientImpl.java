@@ -28,6 +28,7 @@ public class RemnawaveClientImpl implements RemnawaveClient {
     private final int TRIAL_HWID_DEVICE_LIMIT = 2;
 
     @Override
+    // TODO bring this logic to the service
     public RemnawaveUserResponse createBasicUser(String username, Long telegramId) {
         return remnawaveRestClient.post()
                 .uri("/api/users")

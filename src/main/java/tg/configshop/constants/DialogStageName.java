@@ -9,6 +9,7 @@ public enum DialogStageName {
     PROMO_CODE_INPUT("promo_input"),
     PAYMENT("payment"),
     CRYPTO_WITHDRAW_SUM("crypto_wd_sum"),
+    ADD_REF_PROMO_INPUT("add_ref_promo"),
     DEVICE_INPUT("device_input"),
     NONE("none");
 

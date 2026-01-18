@@ -1,4 +1,4 @@
-package tg.configshop.telegram.callbacks.impl;
+package tg.configshop.telegram.callbacks.impl.referrals;
 
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;

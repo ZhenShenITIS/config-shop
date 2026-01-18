@@ -1,4 +1,4 @@
-package tg.configshop.telegram.callbacks.impl;
+package tg.configshop.telegram.callbacks.impl.referrals;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,6 +16,8 @@ import tg.configshop.model.BotUser;
 import tg.configshop.services.ReferralService; // Твой интерфейс
 import tg.configshop.services.UserService;
 import tg.configshop.telegram.callbacks.Callback;
+
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -45,7 +47,7 @@ public class ReferralCallback implements Callback {
         int activeCount = referralService.getActiveReferralCount(userId);
         long profit = referralService.getAllProfit(userId);
         long available = referralService.getAvailableSumToWithdraw(userId);
-        String promoCode = referralService.getReferralPromoCode(userId);
+        List<String> promoCode = referralService.getReferralPromoCodes(userId);
         BotUser botUser = userService.getUser(userId);
 
         int lvl1 = botUser.getReferralPercentage1lvl();
@@ -53,15 +55,19 @@ public class ReferralCallback implements Callback {
         int lvl2 = botUser.getReferralPercentage2lvl();
         int lvl3 = botUser.getReferralPercentage3lvl();
 
+        String messageTemplate =
+                promoCode.size() > 1 ?
+                        MessageText.REFERRAL_MENU_MANY_CODES.getMessageText() :
+                        MessageText.REFERRAL_MENU.getMessageText();
 
         String refLink = String.format("https://t.me/%s?start=%d", botUsername, userId);
 
-        String text = MessageText.REFERRAL_MENU.getMessageText().formatted(
+        String text = messageTemplate.formatted(
                 allCount,
                 activeCount,
                 profit,
                 available,
-                promoCode,
+                getPromoAsString(promoCode),
                 lvl1,
                 lvl2,
                 lvl3,
@@ -80,6 +86,12 @@ public class ReferralCallback implements Callback {
                                 .url("t.me/" + supportUsername)
                                 // TODO
                                 //.callbackData(CallbackName.WITHDRAW.getCallbackName())
+                                .build()
+                ))
+                .keyboardRow(new InlineKeyboardRow(
+                        InlineKeyboardButton.builder()
+                                .text(ButtonText.ADD_PROMO.getText())
+                                .callbackData(CallbackName.ADD_REF_PROMO.getCallbackName())
                                 .build()
                 ))
                 .keyboardRow(new InlineKeyboardRow(
@@ -104,5 +116,16 @@ public class ReferralCallback implements Callback {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+
+    private String getPromoAsString (List<String> promoCodes) {
+        StringBuilder sb = new StringBuilder();
+        for (String s : promoCodes) {
+            sb.append("\n<code>");
+            sb.append(s);
+            sb.append("</code>");
+        }
+        return sb.toString();
     }
 }

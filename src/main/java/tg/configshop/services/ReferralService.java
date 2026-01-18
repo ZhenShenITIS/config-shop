@@ -15,7 +15,7 @@ public interface ReferralService {
     int getAllReferralCount (Long userId);
     int getActiveReferralCount (Long userId);
     long getAllProfit (Long userId);
-    String getReferralPromoCode (Long userId);
+    List<String> getReferralPromoCodes (Long userId);
     Optional<Long> getReferrerId (Long userId);
     Long getAvailableSumToWithdraw(Long userId);
     Page<ReferralWithProfitAndLevel> getReferralsWithProfitAndLevel (Long userId, int pageNumber);

@@ -1,4 +1,4 @@
-package tg.configshop.telegram.callbacks.impl;
+package tg.configshop.telegram.callbacks.impl.referrals;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -13,18 +13,14 @@ import org.telegram.telegrambots.meta.generics.TelegramClient;
 import tg.configshop.constants.ButtonText;
 import tg.configshop.constants.CallbackName;
 import tg.configshop.constants.MessageText;
-import tg.configshop.dto.ReferralWithProfit;
 import tg.configshop.dto.ReferralWithProfitAndLevel;
 import tg.configshop.model.BotUser;
 import tg.configshop.services.ReferralService;
 import tg.configshop.telegram.callbacks.Callback;
 import tg.configshop.util.DateUtil;
 
-import java.time.Instant;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 @Component
 @RequiredArgsConstructor

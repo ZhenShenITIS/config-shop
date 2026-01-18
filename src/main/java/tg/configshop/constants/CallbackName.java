@@ -53,6 +53,8 @@ public enum CallbackName {
     PREVIEW_DEVICE_PURCHASE("j"),
     CANCEL_DEVICE_PURCHASE("x"),
 
+    ADD_REF_PROMO("z"),
+
     BACK_TO_MENU("y");
 
     private final String callbackName;

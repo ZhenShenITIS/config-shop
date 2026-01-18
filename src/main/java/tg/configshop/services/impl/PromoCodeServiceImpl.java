@@ -5,11 +5,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tg.configshop.constants.TopUpSource;
 import tg.configshop.exceptions.promocode.CyclicReferralException;
+import tg.configshop.exceptions.promocode.InvalidSymbolsPromoException;
+import tg.configshop.exceptions.promocode.PromoCodeAlreadyExistException;
 import tg.configshop.exceptions.promocode.PromoCodeAlreadyUsedException;
 import tg.configshop.exceptions.promocode.PromoCodeEndedException;
 import tg.configshop.exceptions.promocode.PromoCodeNotFoundException;
 import tg.configshop.exceptions.promocode.ReferralPromoCodeAlreadyUsedException;
 import tg.configshop.exceptions.promocode.SelfReferralException;
+import tg.configshop.exceptions.promocode.TooManyReferralPromoException;
 import tg.configshop.model.BotUser;
 import tg.configshop.model.PromoCode;
 import tg.configshop.model.PromoCodeUse;
@@ -21,6 +24,7 @@ import tg.configshop.repositories.ReferralRepository;
 import tg.configshop.repositories.TopUpRepository;
 import tg.configshop.services.PromoCodeService;
 import tg.configshop.services.ReferralService;
+import tg.configshop.util.StringUtil;
 
 import java.time.Instant;
 
@@ -34,10 +38,14 @@ public class PromoCodeServiceImpl implements PromoCodeService {
     private final TopUpRepository topUpRepository;
     private final ReferralRepository referralRepository;
 
+    private final int MAX_USES_REFERRAL_CODE = 10000;
+    private final long AMOUNT_REFERRAL_CODE = 100;
+
     @Override
     @Transactional
     public void activatePromoCode(String code, Long userId) {
-        PromoCode promoCode = getPromoCode(code);
+
+        PromoCode promoCode = getPromoCode(code.toUpperCase().trim());
 
         BotUser user = getBotUser(userId);
 
@@ -53,11 +61,36 @@ public class PromoCodeServiceImpl implements PromoCodeService {
 
     @Override
     @Transactional
-    public void createPromoCode(PromoCode promoCode) {
+    public void createPromoCode(PromoCode promoCode) throws PromoCodeAlreadyExistException {
         if (promoCodeRepository.findByCode(promoCode.getCode()).isPresent()) {
-            throw new RuntimeException("Промокод с таким названием уже существует");
+            throw new PromoCodeAlreadyExistException();
         }
         promoCodeRepository.save(promoCode);
+    }
+
+    @Override
+    @Transactional
+    public void createReferralPromoCode(String code, Long userId) throws TooManyReferralPromoException, PromoCodeAlreadyExistException, InvalidSymbolsPromoException {
+        String upperCode = code.toUpperCase().trim();
+
+        StringUtil.validateCodeFormat(upperCode);
+
+        if (promoCodeRepository.findByCode(upperCode).isPresent()) {
+            throw new PromoCodeAlreadyExistException();
+        }
+
+        if (promoCodeRepository.findCodesByReferrer(botUserRepository.getReferenceById(userId)).size() >= 10) {
+            throw new TooManyReferralPromoException();
+        }
+
+        promoCodeRepository.save(PromoCode
+                .builder()
+                        .isReferral(true)
+                        .referrer(botUserRepository.getReferenceById(userId))
+                        .maxUses(MAX_USES_REFERRAL_CODE)
+                        .amount(AMOUNT_REFERRAL_CODE)
+                        .code(upperCode)
+                .build());
     }
 
     private PromoCode getPromoCode (String code) {

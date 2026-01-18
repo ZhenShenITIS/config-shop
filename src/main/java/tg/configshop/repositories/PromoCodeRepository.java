@@ -18,4 +18,7 @@ public interface PromoCodeRepository extends JpaRepository<PromoCode, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT p FROM PromoCode p WHERE p.code = :code")
     Optional<PromoCode> findByCodeWithLock(String code);
+
+    @Query("SELECT p.code FROM PromoCode p WHERE p.referrer = :referrer")
+    List<String> findCodesByReferrer(BotUser referrer);
 }

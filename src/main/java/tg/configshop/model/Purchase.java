@@ -1,6 +1,8 @@
 package tg.configshop.model;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -12,6 +14,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import tg.configshop.constants.PurchaseType;
 
 import java.time.Instant;
 
@@ -35,4 +38,9 @@ public class Purchase {
     private BotUser botUser;
     @Builder.Default
     private Instant createdAt = Instant.now();
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    // DEVICE, SUBSCRIPTION
+    private PurchaseType purchaseType = PurchaseType.SUBSCRIPTION;
+    private Integer deviceCount;
 }

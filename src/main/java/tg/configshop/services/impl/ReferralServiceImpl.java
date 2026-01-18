@@ -90,8 +90,8 @@ public class ReferralServiceImpl implements ReferralService {
     }
 
     @Override
-    public String getReferralPromoCode(Long userId) {
-        return promoCodeRepository.findAllByReferrer(botUserRepository.getReferenceById(userId)).get(0).getCode();
+    public List<String> getReferralPromoCodes(Long userId) {
+        return promoCodeRepository.findCodesByReferrer(botUserRepository.getReferenceById(userId));
     }
 
     @Override
