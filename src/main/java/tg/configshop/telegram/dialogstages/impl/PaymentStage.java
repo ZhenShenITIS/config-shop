@@ -20,6 +20,8 @@ import tg.configshop.repositories.UserStateRepository;
 import tg.configshop.services.PaymentService;
 import tg.configshop.telegram.callbacks.impl.payment.TopUpCallback;
 import tg.configshop.telegram.dialogstages.DialogStage;
+import tg.configshop.telegram.dto.BotMessageParams;
+import tg.configshop.telegram.message_body.StartCommandBody;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -30,6 +32,7 @@ public class PaymentStage implements DialogStage {
     private final UserStateRepository stateRepository;
     private final TopUpCallback topUpCallback;
     private final PaymentService paymentService;
+    private final StartCommandBody startCommandBody;
 
     public static final String PAYLOAD_SEPARATOR = ":";
     public static final long MIN_PAY_AMOUNT = 100;
@@ -101,13 +104,7 @@ public class PaymentStage implements DialogStage {
                 .build();
         rows.add(new InlineKeyboardRow(checkButton));
 
-        InlineKeyboardButton backButton = InlineKeyboardButton.builder()
-                .text(ButtonText.BACK.getText())
-                .callbackData(CallbackName.TOP_UP.getCallbackName())
-                .build();
-        rows.add(new InlineKeyboardRow(backButton));
-
-        SendMessage sendMessage = SendMessage.builder()
+        SendMessage paymentMessage = SendMessage.builder()
                 .chatId(chatId)
                 .text(text)
                 .parseMode("HTML")
@@ -115,7 +112,7 @@ public class PaymentStage implements DialogStage {
                 .build();
 
         try {
-            telegramClient.execute(sendMessage);
+            telegramClient.execute(paymentMessage);
         } catch (TelegramApiException e) {
             e.printStackTrace();
         }
