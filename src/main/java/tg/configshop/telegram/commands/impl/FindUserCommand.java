@@ -21,6 +21,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class FindUserCommand implements Command {
     private final UserService userService;
+    private final ObjectMapper objectMapper;
 
 
     @Override
@@ -31,7 +32,7 @@ public class FindUserCommand implements Command {
     @Override
     @AdminOnly
     public void handleCommand(Message message, TelegramClient telegramClient) {
-        ObjectMapper objectMapper = new ObjectMapper();
+
         String textToSend;
         String msgPayload = message.getText().split(" ")[1];
         try {

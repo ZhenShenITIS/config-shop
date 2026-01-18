@@ -29,39 +29,35 @@ public class SpringConfig {
     private static final DateTimeFormatter INSTANT_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
             .withZone(ZoneId.of("Europe/Moscow"));
 
-//
-//    @Bean
-//    @Primary
-//    public ObjectMapper objectMapper() {
-//        ObjectMapper mapper = new ObjectMapper();
-//
-//        JavaTimeModule javaTimeModule = new JavaTimeModule();
-//
-//        javaTimeModule.addSerializer(Instant.class, new JsonSerializer<Instant>() {
-//            @Override
-//            public void serialize(Instant value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-//                gen.writeString(INSTANT_FORMATTER.format(value));
-//            }
-//        });
-//
-//        mapper.registerModule(javaTimeModule);
-//
-//        mapper.findAndRegisterModules();
-//
-//        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-//
-//        mapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
-//
-//        mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
-//
-//        mapper.registerModule(new ParameterNamesModule());
-//
-//
-//        mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-//
-//
-//        mapper.enable(SerializationFeature.INDENT_OUTPUT);
-//
-//        return mapper;
-//    }
+
+    @Bean
+    public ObjectMapper mapperWithInstant() {
+        ObjectMapper mapper = new ObjectMapper();
+
+        JavaTimeModule javaTimeModule = new JavaTimeModule();
+
+        javaTimeModule.addSerializer(Instant.class, new JsonSerializer<Instant>() {
+            @Override
+            public void serialize(Instant value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+                gen.writeString(INSTANT_FORMATTER.format(value));
+            }
+        });
+
+        mapper.registerModule(javaTimeModule);
+
+        mapper.findAndRegisterModules();
+
+        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+        mapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
+
+
+
+        mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+
+
+        mapper.enable(SerializationFeature.INDENT_OUTPUT);
+
+        return mapper;
+    }
 }
