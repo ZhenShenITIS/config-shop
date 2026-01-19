@@ -129,9 +129,25 @@ public class HistoryCallback implements Callback {
             String template = OperationType.TOP_UP.equals(v.getOperationType())
                     ? MessageText.HISTORY_TOP_UP.getMessageText()
                     : MessageText.HISTORY_PURCHASE.getMessageText();
-            stringBuilder.append(template.formatted(v.getAmount(), DateUtil.getPrettyDateWithTime(v.getDate()), v.getDescription()));
+            stringBuilder.append(template.formatted(v.getAmount(), DateUtil.getPrettyDateWithTime(v.getDate()), getDescriptionView(v)));
             stringBuilder.append("\n");
         }
         return stringBuilder.toString();
+    }
+
+    private String getDescriptionView(OperationView v) {
+        if (OperationType.TOP_UP.equals(v.getOperationType())) {
+            return switch (v.getTopUpSource()) {
+                case ADMIN -> MessageText.HISTORY_ADMIN.getMessageText();
+                case EXTERNAL -> MessageText.HISTORY_EXTERNAL.getMessageText();
+                case REFERRAL -> MessageText.HISTORY_REFERRAL.getMessageText();
+                case PROMO_CODE -> MessageText.HISTORY_PROMO_CODE.getMessageText();
+            };
+        } else {
+            return switch (v.getPurchaseType()) {
+                case SUBSCRIPTION -> MessageText.HISTORY_SUBSCRIPTION.getMessageText().formatted(v.getDurationDays(), v.getDeviceCount());
+                case DEVICE -> MessageText.HISTORY_DEVICE.getMessageText().formatted(v.getDeviceCount());
+            };
+        }
     }
 }

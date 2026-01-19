@@ -9,34 +9,38 @@ import tg.configshop.dto.OperationView;
 import tg.configshop.model.Purchase;
 
 public interface PurchaseRepository extends JpaRepository<Purchase, Long> {
-
+    // TODO fix this shit
     @Query(value = """
-            WITH operations AS (SELECT value AS amount,
+            WITH operations AS (
+            SELECT value AS amount,
             created_at AS date,
-            (CASE top_ups.top_up_source
-                WHEN 'REFERRAL' THEN 'Реферальное пополнение'
-                WHEN 'EXTERNAL' THEN 'Пополнение баланса'
-                WHEN 'PROMO_CODE' THEN 'Применение промокода'
-                WHEN 'ADMIN' THEN 'Пополнение администратором'
-                ELSE 'Неизвестное пополнение'
-            END) AS description,
-            'TOP_UP' AS operationType
+            'TOP_UP' AS operationType,
+            top_up_source AS topUpSource,
+            NULL AS purchaseType,
+            NULL AS deviceCount,
+            NULL AS durationDays
             FROM shop_db.public.top_ups where bot_user_id = :userId
-                        
-            UNION ALL 
+            
+            UNION ALL
             
             SELECT paid_amount AS amount,
             created_at AS date,
-            (CASE purchases.purchase_type
-                WHEN 'DEVICE' THEN CONCAT('Покупка дополнительных устройств (', purchases.device_count, ' шт.)')
-                WHEN 'SUBSCRIPTION' THEN CONCAT('Покупка подписки на ', COALESCE(s.duration_days, 0), ' дней и ', COALESCE(s.device_count, 0), ' устройств(а)')
-                ELSE 'Неизвестная покупка'
-            END) AS description,
-            'PURCHASE' AS operationType
+            'PURCHASE' AS operationType,
+            NULL AS topUpSource,
+            purchases.purchase_type AS purchaseType,
+            (CASE purchase_type
+                WHEN 'SUBSCRIPTION' THEN s.device_count
+                WHEN 'DEVICE' THEN purchases.device_count
+                ELSE 0
+            END) AS deviceCount,
+            (CASE purchase_type
+                WHEN 'SUBSCRIPTION' THEN s.duration_days
+                ELSE 0
+            END) AS durationDays
             FROM shop_db.public.purchases
             LEFT JOIN public.subscriptions s on s.id = purchases.subscription_id
             where bot_user_id = :userId)
-                        
+            
             SELECT * FROM operations ORDER BY operations.date DESC;
             """,
             countQuery = """
