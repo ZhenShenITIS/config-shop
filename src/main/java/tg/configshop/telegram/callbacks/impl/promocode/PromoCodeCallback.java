@@ -1,4 +1,4 @@
-package tg.configshop.telegram.callbacks.impl;
+package tg.configshop.telegram.callbacks.impl.promocode;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

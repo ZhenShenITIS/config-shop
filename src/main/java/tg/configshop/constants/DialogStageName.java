@@ -11,6 +11,7 @@ public enum DialogStageName {
     CRYPTO_WITHDRAW_SUM("crypto_wd_sum"),
     ADD_REF_PROMO_INPUT("add_ref_promo"),
     DEVICE_INPUT("device_input"),
+    CRYPTO_WITHDRAW_WALLET("crypto_wd_wallet"),
     NONE("none");
 
     private final String dialogStageName;

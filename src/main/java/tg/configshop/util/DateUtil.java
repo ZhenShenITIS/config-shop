@@ -33,6 +33,7 @@ public class DateUtil {
     }
 
     public static String getPrettyDateWithTime (Instant date) {
+        if (date == null) return "";
         ZonedDateTime zdt = date.atZone(ZoneId.of("Europe/Moscow"));
         return zdt.format(dateTimeFormatter);
     }

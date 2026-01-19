@@ -1,4 +1,4 @@
-package tg.configshop.telegram.callbacks.impl;
+package tg.configshop.telegram.callbacks.impl.balance;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

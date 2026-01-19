@@ -45,6 +45,9 @@ public enum ButtonText {
     DELETE_DEVICES("🗑️ Удалить устройства"),
     BUY_MORE_DEVICES("➕ Докупить устройства"),
     ADD_PROMO("➕ Добавить промокод"),
+    ADMIN_APPROVE("✅ Выплачено"),
+    ADMIN_REJECT("❌ Отклонить"),
+    ADMIN_REFRESH("🔄 Обновить статус"),
     BACK_TO_MENU("🔙 В главное меню");
 
     private final String text;

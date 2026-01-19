@@ -1,4 +1,4 @@
-package tg.configshop.telegram.callbacks.impl;
+package tg.configshop.telegram.callbacks.impl.balance;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -22,7 +22,6 @@ import tg.configshop.telegram.callbacks.Callback;
 import tg.configshop.util.DateUtil;
 
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 
 @RequiredArgsConstructor
@@ -125,10 +124,12 @@ public class HistoryCallback implements Callback {
 
     private String getPrettyOperationList(Page<OperationView> page) {
         StringBuilder stringBuilder = new StringBuilder();
-        for (OperationView v : page) {
-            String template = OperationType.TOP_UP.equals(v.getOperationType())
-                    ? MessageText.HISTORY_TOP_UP.getMessageText()
-                    : MessageText.HISTORY_PURCHASE.getMessageText();
+        for (OperationView v : page) {;
+            String template = switch (v.getOperationType()) {
+                case TOP_UP -> MessageText.HISTORY_TOP_UP.getMessageText();
+                case PURCHASE -> MessageText.HISTORY_PURCHASE.getMessageText();
+                case WITHDRAW -> MessageText.HISTORY_WITHDRAW.getMessageText();
+            };
             stringBuilder.append(template.formatted(v.getAmount(), DateUtil.getPrettyDateWithTime(v.getDate()), getDescriptionView(v)));
             stringBuilder.append("\n");
         }
@@ -143,10 +144,16 @@ public class HistoryCallback implements Callback {
                 case REFERRAL -> MessageText.HISTORY_REFERRAL.getMessageText();
                 case PROMO_CODE -> MessageText.HISTORY_PROMO_CODE.getMessageText();
             };
-        } else {
+        } else if (OperationType.PURCHASE.equals(v.getOperationType())){
             return switch (v.getPurchaseType()) {
                 case SUBSCRIPTION -> MessageText.HISTORY_SUBSCRIPTION.getMessageText().formatted(v.getDurationDays(), v.getDeviceCount());
                 case DEVICE -> MessageText.HISTORY_DEVICE.getMessageText().formatted(v.getDeviceCount());
+            };
+        } else {
+            return switch (v.getWithdrawalStatus()) {
+                case DONE -> MessageText.HISTORY_DONE.getMessageText();
+                case REJECTED -> MessageText.HISTORY_REJECTED.getMessageText();
+                case IN_PROGRESS -> MessageText.HISTORY_IN_PROGRESS.getMessageText();
             };
         }
     }

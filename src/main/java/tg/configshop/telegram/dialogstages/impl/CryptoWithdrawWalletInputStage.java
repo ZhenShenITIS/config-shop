@@ -15,11 +15,9 @@ import tg.configshop.constants.ButtonText;
 import tg.configshop.constants.CallbackName;
 import tg.configshop.constants.DialogStageName;
 import tg.configshop.constants.MessageText;
-import tg.configshop.constants.WithdrawalType;
 import tg.configshop.dto.WithdrawalContext;
 import tg.configshop.repositories.UserStateRepository;
-import tg.configshop.services.ReferralService;
-import tg.configshop.telegram.callbacks.impl.withdrawals.WithdrawalCallback; // Предполагаю, что класс называется так, исправь если WithdrawCallback
+import tg.configshop.telegram.callbacks.impl.withdrawals.WithdrawalCallback;
 import tg.configshop.telegram.dialogstages.DialogStage;
 
 import java.util.ArrayList;
@@ -28,17 +26,14 @@ import java.util.List;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class CryptoWithdrawSumInputStage implements DialogStage {
+public class CryptoWithdrawWalletInputStage implements DialogStage {
 
     private final UserStateRepository userStateRepository;
-    private final ReferralService referralService;
     private final WithdrawalCallback withdrawalCallback;
-
-    private static final long MIN_WITHDRAWAL_SUM = 1000L;
 
     @Override
     public DialogStageName getDialogStage() {
-        return DialogStageName.CRYPTO_WITHDRAW_SUM;
+        return DialogStageName.CRYPTO_WITHDRAW_WALLET;
     }
 
     @Override
@@ -51,6 +46,7 @@ public class CryptoWithdrawSumInputStage implements DialogStage {
             withdrawalCallback.processCallback(callbackQuery, telegramClient);
             return;
         }
+
         try {
             telegramClient.execute(AnswerCallbackQuery.builder()
                     .callbackQueryId(callbackQuery.getId())
@@ -64,49 +60,33 @@ public class CryptoWithdrawSumInputStage implements DialogStage {
     public void answerMessage(Message message, TelegramClient telegramClient) {
         long userId = message.getFrom().getId();
         long chatId = message.getChatId();
-        String text = message.getText().trim();
+        String walletAddress = message.getText().trim();
 
-        String responseText;
-        boolean success = false;
-        long amountToWithdraw = 0;
+        WithdrawalContext context = userStateRepository.getWithdrawalContext(userId);
 
-        try {
-            amountToWithdraw = Long.parseLong(text);
-            long availableBalance = referralService.getAvailableSumToWithdraw(userId);
-
-            if (amountToWithdraw < MIN_WITHDRAWAL_SUM) {
-                responseText = String.format(MessageText.WITHDRAWAL_SUM_TOO_SMALL.getMessageText(), MIN_WITHDRAWAL_SUM);
-            } else if (amountToWithdraw > availableBalance) {
-                responseText = String.format(MessageText.WITHDRAWAL_INSUFFICIENT_FUNDS.getMessageText(), availableBalance, amountToWithdraw);
-            } else {
-                success = true;
-                responseText = String.format(MessageText.CRYPTO_WALLET_INPUT.getMessageText(), amountToWithdraw);
-            }
-
-        } catch (NumberFormatException e) {
-            responseText = MessageText.WITHDRAWAL_FORMAT_ERROR.getMessageText();
-        } catch (Exception e) {
-            log.error("Error in withdrawal sum input", e);
-            responseText = MessageText.WITHDRAWAL_ERROR.getMessageText();
+        if (context == null) {
+            userStateRepository.put(userId, DialogStageName.NONE);
+            sendError(telegramClient, chatId);
+            return;
         }
 
-        if (success) {
-            WithdrawalContext context = new WithdrawalContext();
-            context.setAmount(amountToWithdraw);
-            context.setWithdrawalType(WithdrawalType.CRYPTO);
+        context.setRequisites(walletAddress);
+        userStateRepository.putWithdrawalContext(userId, context);
 
-            userStateRepository.putWithdrawalContext(userId, context);
+        String text = String.format(MessageText.WITHDRAWAL_CONFIRMATION.getMessageText(),
+                context.getAmount(),
+                walletAddress);
 
-            userStateRepository.put(userId, DialogStageName.CRYPTO_WITHDRAW_WALLET);
-
-        }
-
-
-        sendReply(telegramClient, chatId, responseText);
-    }
-
-    private void sendReply(TelegramClient telegramClient, long chatId, String text) {
         List<InlineKeyboardRow> rows = new ArrayList<>();
+
+        rows.add(new InlineKeyboardRow(
+                InlineKeyboardButton.builder()
+                        .text(ButtonText.CONFIRM_BUY.getText()) // Используем "Подтвердить"
+                        .callbackData(CallbackName.CONFIRM_WITHDRAWAL.getCallbackName())
+                        .build()
+        ));
+
+
         rows.add(new InlineKeyboardRow(
                 InlineKeyboardButton.builder()
                         .text(ButtonText.BACK.getText())
@@ -123,8 +103,21 @@ public class CryptoWithdrawSumInputStage implements DialogStage {
 
         try {
             telegramClient.execute(sm);
+            userStateRepository.put(userId, DialogStageName.NONE);
         } catch (Exception e) {
-            log.error("Error sending message", e);
+            log.error("Error sending confirmation", e);
+        }
+    }
+
+    private void sendError(TelegramClient client, long chatId) {
+        try {
+            client.execute(SendMessage.builder()
+                    .chatId(chatId)
+                    .text(MessageText.UNKNOWN_ERROR.getMessageText())
+                    .parseMode("HTML")
+                    .build());
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 }

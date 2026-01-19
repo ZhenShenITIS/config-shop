@@ -52,6 +52,10 @@ public enum CallbackName {
     CONFIRM_DEVICE_PURCHASE("t"),
     PREVIEW_DEVICE_PURCHASE("j"),
     CANCEL_DEVICE_PURCHASE("x"),
+    CONFIRM_WITHDRAWAL("w1"),
+    ADMIN_APPROVE_WD("adm_w_ok"),
+    ADMIN_REJECT_WD("adm_w_no"),
+    ADMIN_REFRESH_WD("adm_w_upd"),
 
     ADD_REF_PROMO("z"),
 

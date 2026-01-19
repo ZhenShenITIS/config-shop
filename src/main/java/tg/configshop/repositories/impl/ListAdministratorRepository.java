@@ -34,4 +34,9 @@ public class ListAdministratorRepository implements AdministratorRepository {
     public boolean isAdmin(Long userId) {
         return adminList.contains(userId);
     }
+
+    @Override
+    public List<Long> getAdminIdList() {
+        return adminList;
+    }
 }

@@ -29,9 +29,6 @@ public class ReferralCallback implements Callback {
     @Value("${TELEGRAM_BOT_USERNAME}")
     private String botUsername;
 
-    @Value("${SUPPORT_USERNAME}")
-    private String supportUsername;
-
     @Override
     public CallbackName getCallback() {
         return callbackName;
@@ -83,9 +80,7 @@ public class ReferralCallback implements Callback {
                                 .build(),
                         InlineKeyboardButton.builder()
                                 .text(ButtonText.WITHDRAW.getText())
-                                .url("t.me/" + supportUsername)
-                                // TODO
-                                //.callbackData(CallbackName.WITHDRAW.getCallbackName())
+                                .callbackData(CallbackName.WITHDRAW.getCallbackName())
                                 .build()
                 ))
                 .keyboardRow(new InlineKeyboardRow(

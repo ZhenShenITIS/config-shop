@@ -22,7 +22,7 @@ import tg.configshop.exceptions.promocode.ReferralPromoCodeAlreadyUsedException;
 import tg.configshop.exceptions.promocode.SelfReferralException;
 import tg.configshop.repositories.UserStateRepository;
 import tg.configshop.services.PromoCodeService;
-import tg.configshop.telegram.callbacks.impl.BackToMenuCallback;
+import tg.configshop.telegram.callbacks.impl.other.BackToMenuCallback;
 import tg.configshop.telegram.dialogstages.DialogStage;
 
 @RequiredArgsConstructor

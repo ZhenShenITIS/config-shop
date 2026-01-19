@@ -45,7 +45,8 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public void decreaseBalance(Long userId, Long amount) throws InsufficientBalanceException {
-        BotUser user = getUser(userId);
+        BotUser user = botUserRepository.findByIdWithLock(userId)
+                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
         if (user.getBalance() < amount) {
             throw new InsufficientBalanceException("Insufficient balance");
         }
