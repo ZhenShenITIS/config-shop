@@ -1,6 +1,7 @@
 package tg.configshop.telegram.callbacks.impl.payment;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
@@ -14,14 +15,20 @@ import tg.configshop.constants.ButtonText;
 import tg.configshop.constants.CallbackName;
 import tg.configshop.constants.MessageText;
 import tg.configshop.constants.PaymentResult;
+import tg.configshop.dto.PaymentContext;
+import tg.configshop.repositories.UserStateRepository;
 import tg.configshop.services.PaymentService;
 import tg.configshop.telegram.callbacks.Callback;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class CheckStatusPaymentCallback implements Callback {
     public static final String PAYLOAD_SEPARATOR = ":";
     private final PaymentService paymentService;
+    private final UserStateRepository stateRepository;
+
+    private final long DELAY_BETWEEN_CHECKS = 30_000;
 
     @Override
     public CallbackName getCallback() {
@@ -31,9 +38,18 @@ public class CheckStatusPaymentCallback implements Callback {
     @Override
     public void processCallback(CallbackQuery callbackQuery, TelegramClient telegramClient) {
         long userId = callbackQuery.getFrom().getId();
+        String callbackId = callbackQuery.getId();
+        long now = System.currentTimeMillis();
+        PaymentContext paymentContext = stateRepository.getPaymentContext(userId);
+        if (!(now - DELAY_BETWEEN_CHECKS > paymentContext.lastCheckTime())) {
+            answerQuery(callbackId, MessageText.PROCESSING_PAY.getMessageText(), telegramClient);
+            log.info("Requests for payment status updates are too frequent. UserId: {}", userId);
+            return;
+        }
+        stateRepository.putPaymentContext(userId, new PaymentContext(paymentContext.paymentMethod(), now));
         long chatId = callbackQuery.getMessage().getChatId();
         int messageId = callbackQuery.getMessage().getMessageId();
-        String callbackId = callbackQuery.getId();
+
         String data = callbackQuery.getData();
 
         String[] parts = data.split(PAYLOAD_SEPARATOR);
@@ -45,7 +61,7 @@ public class CheckStatusPaymentCallback implements Callback {
         String transactionId = parts[1];
 
         PaymentResult paymentResult = paymentService.checkPayment(transactionId, userId);
-
+        log.info("Send request to payment service. Result: {}, userId: {}", paymentResult, userId);
 
         switch (paymentResult) {
             case CONFIRMED ->

@@ -71,8 +71,8 @@ public class SubscriptionCallback implements Callback {
         String statusEmoji = remoteUser.isActive() ? "🟢" : "🔴";
         String dateEnd = remoteUser.prettyDateExpireAt();
         long daysLeft = remoteUser.daysLeft();
-
-        String text = MessageText.SUBSCRIPTION.getMessageText().formatted(
+        String temp = limitTrafficGb == 0 ? MessageText.SUBSCRIPTION.getMessageText() : MessageText.SUBSCRIPTION_TRIAL.getMessageText();
+        String text = temp.formatted(
                 callbackQuery.getFrom().getFirstName(),
                 botUser.getId(),
                 botUser.getBalance(),
