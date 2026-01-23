@@ -17,6 +17,7 @@ import tg.configshop.model.PromoCode;
 import tg.configshop.model.Referral;
 import tg.configshop.repositories.BotUserRepository;
 import tg.configshop.repositories.PromoCodeRepository;
+import tg.configshop.repositories.PromoCodeUseRepository;
 import tg.configshop.repositories.ReferralRepository;
 import tg.configshop.repositories.TopUpRepository;
 import tg.configshop.repositories.WithdrawalRepository;
@@ -38,6 +39,7 @@ public class ReferralServiceImpl implements ReferralService {
     private final PromoCodeRepository promoCodeRepository;
     private final TopUpRepository topUpRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final PromoCodeUseRepository promoCodeUseRepository;
 
 
     private final WithdrawalRepository withdrawalRepository;
@@ -126,6 +128,11 @@ public class ReferralServiceImpl implements ReferralService {
                     view.getLvl()
             );
         });
+    }
+
+    @Override
+    public Optional<PromoCode> getUsedPromo(Long userId) {
+        return promoCodeUseRepository.findReferralPromoUse(userId);
     }
 
     @Override
