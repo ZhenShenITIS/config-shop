@@ -26,7 +26,7 @@ import tg.configshop.telegram.message_body.StartCommandBody;
 import java.util.ArrayList;
 import java.util.List;
 
-@Component
+//@Component
 @RequiredArgsConstructor
 public class PaymentStage implements DialogStage {
     private final UserStateRepository stateRepository;

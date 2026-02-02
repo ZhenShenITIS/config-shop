@@ -18,7 +18,7 @@ import tg.configshop.external_api.pay.constants.PaymentMethod;
 import tg.configshop.repositories.UserStateRepository;
 import tg.configshop.telegram.callbacks.Callback;
 
-@Component
+//@Component
 @RequiredArgsConstructor
 public class PaymentInputSumCallback implements Callback {
     private final UserStateRepository userStateRepository;

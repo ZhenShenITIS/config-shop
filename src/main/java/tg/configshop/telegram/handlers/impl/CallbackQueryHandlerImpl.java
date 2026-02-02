@@ -4,20 +4,23 @@ import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
+import tg.configshop.repositories.RedisStateManager;
 import tg.configshop.repositories.UserStateRepository;
 import tg.configshop.constants.DialogStageName;
 import tg.configshop.telegram.containers.CallbackContainer;
 import tg.configshop.telegram.containers.DialogStateContainer;
 import tg.configshop.telegram.handlers.CallbackQueryHandler;
 
+import java.util.Optional;
+
 @AllArgsConstructor
 @Component
 public class CallbackQueryHandlerImpl implements CallbackQueryHandler {
     private final CallbackContainer callbackContainer;
 
-    private final UserStateRepository userStateRepository;
-
     private final DialogStateContainer dialogStateContainer;
+
+    private final RedisStateManager<Long, DialogStageName> dialogStageNameRedisStateManager;
 
     @Override
     public void processCallbackQuery(CallbackQuery callbackQuery, TelegramClient telegramClient) {
@@ -26,9 +29,10 @@ public class CallbackQueryHandlerImpl implements CallbackQueryHandler {
 //        if (!userAllowId.equals(userCallbackId)) {
 //            return;
 //        }
-        DialogStageName stage = userStateRepository.get(userCallbackId);
-        if (!stage.equals(DialogStageName.NONE)) {
-            dialogStateContainer.retrieveDialogStage(stage.getDialogStageName()).processCallbackQuery(callbackQuery, telegramClient);
+
+        Optional<DialogStageName> stage = dialogStageNameRedisStateManager.get(userCallbackId);
+        if (stage.isPresent()) {
+            dialogStateContainer.retrieveDialogStage(stage.get().getDialogStageName()).processCallbackQuery(callbackQuery, telegramClient);
             return;
         }
         String callbackIdentifier = callbackQuery.getData().split(":")[0];

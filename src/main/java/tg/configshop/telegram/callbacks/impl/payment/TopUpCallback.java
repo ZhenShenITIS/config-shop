@@ -18,7 +18,7 @@ import tg.configshop.telegram.callbacks.Callback;
 import java.util.ArrayList;
 import java.util.List;
 
-@Component
+//@Component
 @RequiredArgsConstructor
 public class TopUpCallback implements Callback {
 

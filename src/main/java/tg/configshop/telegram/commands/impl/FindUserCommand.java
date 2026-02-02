@@ -21,7 +21,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class FindUserCommand implements Command {
     private final UserService userService;
-    private final ObjectMapper objectMapper;
+    private final ObjectMapper mapperWithInstant;
 
 
     @Override
@@ -37,11 +37,11 @@ public class FindUserCommand implements Command {
         String msgPayload = message.getText().split(" ")[1];
         try {
             BotUser botUser = userService.getUser(Long.parseLong(msgPayload));
-            textToSend = objectMapper.writeValueAsString(botUser);
+            textToSend = mapperWithInstant.writeValueAsString(botUser);
         } catch (NumberFormatException e) {
             List<BotUser> botUsers = userService.getUser(msgPayload.replace("@", ""));
             try {
-                textToSend = objectMapper.writeValueAsString(botUsers);
+                textToSend = mapperWithInstant.writeValueAsString(botUsers);
             } catch (JsonProcessingException ex) {
                 textToSend = ex.toString();
             }

@@ -21,7 +21,7 @@ import tg.configshop.services.PaymentService;
 import tg.configshop.telegram.callbacks.Callback;
 
 @Slf4j
-@Component
+//@Component
 @RequiredArgsConstructor
 public class CheckStatusPaymentCallback implements Callback {
     public static final String PAYLOAD_SEPARATOR = ":";

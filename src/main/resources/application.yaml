@@ -1,0 +1,56 @@
+spring:
+  application:
+    name: config-shop
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+
+  quartz:
+    job-store-type: jdbc
+    jdbc:
+      initialize-schema: always
+    properties:
+      org:
+        quartz:
+          jobStore:
+            driverDelegateClass: org.quartz.impl.jdbcjobstore.PostgreSQLDelegate
+
+  cloud:
+    function:
+      definition: confirmedPaymentConsumer
+    stream:
+      kafka:
+        binder:
+          brokers: ${KAFKA_BOOTSTRAP_SERVERS}
+          auto-create-topics: true
+          auto-add-partitions: true
+          consumer-properties:
+            key.deserializer: org.apache.kafka.common.serialization.LongDeserializer
+          producer-properties:
+            key.serializer: org.apache.kafka.common.serialization.LongSerializer
+      bindings:
+        confirmedPaymentConsumer-in-0:
+          destination: confirmed-payment
+          group: main-service
+          content-type: application/json
+
+        telegramCallback-out-0:
+          destination: telegram-callback-query
+          content-type: application/json
+
+        telegramMessage-out-0:
+          destination: telegram-message
+          content-type: application/json
+
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST}
+      port: ${SPRING_DATA_REDIS_PORT}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 2
+          max-wait: 2000ms

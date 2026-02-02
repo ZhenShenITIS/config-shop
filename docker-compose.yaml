@@ -1,9 +1,21 @@
+networks:
+  shop-network:
+    external: true
+
 services:
   app:
-    build: .
+    build:
+      context: .
+      args:
+        GITHUB_TOKEN: ${GITHUB_TOKEN}
+        GITHUB_USERNAME: ${GITHUB_USERNAME}
     container_name: bot
     depends_on:
       - db
+      - kafka
+      - redis
+    networks:
+      - shop-network
     env_file:
       - .env
     environment:
@@ -18,6 +30,8 @@ services:
     image: postgres:17-alpine
     container_name: postgres
     restart: always
+    networks:
+      - shop-network
     environment:
       POSTGRES_DB: shop_db
       POSTGRES_USER: ${POSTGRES_USER}
@@ -25,5 +39,40 @@ services:
     volumes:
       - pg_data:/var/lib/postgresql/data
 
+  kafka:
+    image: 'bitnami/kafka:latest'
+    container_name: kafka
+    networks:
+      - shop-network
+    volumes:
+      - kafka_data:/bitnami/kafka
+    environment:
+      - KAFKA_CFG_NODE_ID=0
+      - KAFKA_CFG_PROCESS_ROLES=controller,broker
+      - KAFKA_CFG_LISTENERS=INTERNAL://:9092,EXTERNAL://:9094,CONTROLLER://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=INTERNAL://kafka:9092,EXTERNAL://localhost:9094
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka:9093
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=INTERNAL
+      - KAFKA_CFG_NUM_PARTITIONS=3
+
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    networks:
+      - shop-network
+    ports:
+      - "${SPRING_DATA_REDIS_PORT}:${SPRING_DATA_REDIS_PORT}"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+
 volumes:
   pg_data:
+  kafka_data:
+  redis_data:
+
+
+

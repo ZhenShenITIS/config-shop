@@ -1,10 +1,12 @@
 package tg.configshop.constants;
 
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 @AllArgsConstructor
 @Getter
+@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, include = JsonTypeInfo.As.PROPERTY, property = "@class")
 public enum DialogStageName {
     PROMO_CODE_INPUT("promo_input"),
     PAYMENT("payment"),

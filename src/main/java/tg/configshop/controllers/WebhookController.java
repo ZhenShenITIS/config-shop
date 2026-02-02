@@ -1,6 +1,5 @@
-package tg.configshop.telegram.bot;
+package tg.configshop.controllers;
 
-// Важно: Импортируем Jackson 2 (com.fasterxml...), а не 3 (tools.jackson...)
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -10,6 +9,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import tg.configshop.telegram.bot.WebhookBot;
 
 @Slf4j
 @RestController
@@ -19,12 +19,12 @@ public class WebhookController {
 
     private final WebhookBot webhookBot;
 
-    private final ObjectMapper jackson2Mapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
     @PostMapping("/webhook")
     public ResponseEntity<String> onUpdateReceived(@RequestBody String json) {
         try {
-            Update update = jackson2Mapper.readValue(json, Update.class);
+            Update update = objectMapper.readValue(json, Update.class);
 
             Thread.startVirtualThread(() -> {
                 try {
