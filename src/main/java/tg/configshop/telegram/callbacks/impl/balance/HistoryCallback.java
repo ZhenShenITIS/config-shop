@@ -128,7 +128,7 @@ public class HistoryCallback implements Callback {
             String template = switch (v.getOperationType()) {
                 case TOP_UP -> MessageText.HISTORY_TOP_UP.getMessageText();
                 case PURCHASE -> MessageText.HISTORY_PURCHASE.getMessageText();
-                case WITHDRAW -> MessageText.HISTORY_WITHDRAW.getMessageText();
+                case WITHDRAWAL -> MessageText.HISTORY_WITHDRAW.getMessageText();
             };
             stringBuilder.append(template.formatted(v.getAmount(), DateUtil.getPrettyDateWithTime(v.getDate()), getDescriptionView(v)));
             stringBuilder.append("\n");
