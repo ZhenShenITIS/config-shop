@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.quartz.JobBuilder;
 import org.quartz.JobDetail;
+import org.quartz.JobKey;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
 import org.quartz.SimpleScheduleBuilder;
@@ -40,7 +41,6 @@ public class SchedulerService {
 
         } catch (SchedulerException e) {
             log.error("Failed to schedule subscription notifications: {}", e.getMessage());
-            throw new RuntimeException(e);
         }
     }
 
@@ -49,12 +49,16 @@ public class SchedulerService {
             throws SchedulerException {
 
         Instant executeAt = expireAt.minus(beforeExpiry);
-
-
         String jobName = String.format("sub_notify_%s_%d", type, userId);
+        JobKey jobKey = JobKey.jobKey(jobName, SUBSCRIPTION_GROUP);
+
+        if (scheduler.checkExists(jobKey)) {
+            scheduler.deleteJob(jobKey);
+            log.debug("Deleted existing job: {}", jobName);
+        }
 
         JobDetail job = JobBuilder.newJob(SubscriptionExpiryNotificationJob.class)
-                .withIdentity(jobName, SUBSCRIPTION_GROUP)
+                .withIdentity(jobKey)
                 .usingJobData("userId", userId)
                 .usingJobData("type", type)
                 .usingJobData("expireAt", expireAt.toEpochMilli())

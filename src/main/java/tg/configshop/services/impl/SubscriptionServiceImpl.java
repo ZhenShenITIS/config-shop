@@ -1,11 +1,12 @@
 package tg.configshop.services.impl;
 
 import lombok.RequiredArgsConstructor;
-import org.quartz.Scheduler;
-import org.quartz.spi.JobFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tg.configshop.events.SubscriptionPaidEvent;
 import tg.configshop.exceptions.subscription.InsufficientBalanceException;
 import tg.configshop.exceptions.subscription.SubscriptionNotFoundException;
 import tg.configshop.external_api.remnawave.RemnawaveClient;
@@ -17,9 +18,11 @@ import tg.configshop.repositories.PurchaseRepository;
 import tg.configshop.repositories.SubscriptionRepository;
 import tg.configshop.services.SubscriptionService;
 import tg.configshop.services.UserService;
+import tg.configshop.util.DateUtil;
 
 import java.time.Instant;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class SubscriptionServiceImpl implements SubscriptionService {
@@ -27,6 +30,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     private final UserService userService;
     private final RemnawaveClient remnawaveClient;
     private final PurchaseRepository purchaseRepository;
+    private final ApplicationEventPublisher applicationEventPublisher;
     @Value("${MIN_DEVICE_COUNT}")
     private int MIN_DEVICE_COUNT;
 
@@ -71,10 +75,13 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         checkBalance(botUser, subscription);
 
         Instant newExpired = getNewExpired(botUser, subscription);
-
+        log.info("Updating sub for userId={}, oldExpire={}, newExpire={}",
+                userId,
+                DateUtil.getPrettyDate(botUser.getExpireAt()),
+                DateUtil.getPrettyDate(newExpired));
         updateUser(botUser, subscription, newExpired);
 
-        updateSubscription(botUser, subscription, newExpired);
+        applicationEventPublisher.publishEvent(new SubscriptionPaidEvent(botUser, subscription, newExpired));
 
         savePurchase(botUser, subscription);
 
@@ -89,12 +96,12 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         }
     }
 
-    private void updateUser (BotUser botUser, Subscription subscription, Instant newExpired) {
+    private void updateUser(BotUser botUser, Subscription subscription, Instant newExpired) {
         botUser.setBalance(botUser.getBalance() - subscription.getCost());
         botUser.setExpireAt(newExpired);
     }
 
-    private Instant getNewExpired (BotUser botUser, Subscription subscription) {
+    private Instant getNewExpired(BotUser botUser, Subscription subscription) {
         long durationSeconds = subscription.getDurationDays() * 24 * 60 * 60;
         if (botUser.getExpireAt().isBefore(Instant.now())) {
             return Instant.now().plusSeconds(durationSeconds);
@@ -103,9 +110,6 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         }
     }
 
-    private void updateSubscription (BotUser botUser, Subscription subscription, Instant newExpired) {
-        remnawaveClient.updateSubscription(botUser.getRemnawaveUuid(), newExpired, subscription.getTrafficLimitGb() * 1024L * 1024 * 1024, subscription.getDeviceCount());
-    }
 
     private void savePurchase(BotUser botUser, Subscription subscription) {
         purchaseRepository.save(Purchase.builder()
