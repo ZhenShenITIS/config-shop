@@ -35,7 +35,7 @@ services:
 
   grafana:
     image: grafana/grafana:latest
-    ports: [ "3000:3000" ]
+    ports: [ "3033:3000" ]
     env_file:
       - .env
     depends_on: [ prometheus, loki ]
