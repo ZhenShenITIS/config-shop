@@ -637,6 +637,14 @@ public enum MessageText {
             ❓ <b>Неизвестная команда</b>
             
             Команда не распознана, пожалуйста, повторите ввод или воспользуйтесь меню.
+            """),
+
+    ALERT_MESSAGE("""
+            ⚠️ <b>Произошла неизвестная ошибка!</b>
+            
+            userId: %d
+            username: @%s
+            error: %s
             """);
 
     private final String messageText;

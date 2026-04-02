@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %highlight(%-5level) [%thread] %cyan(%logger{36}) - %msg %boldYellow(%kvp)%n</pattern>
+        </encoder>
+    </appender>
+
+
+    <springProfile name="!dev">
+        <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
+            <http>
+
+                <url>${LOKI_URL:-http://loki:3100}/loki/api/v1/push</url>
+            </http>
+            <format>
+                <label>
+                    <pattern>app=config-shop,level=%level,host=${HOSTNAME:-local}</pattern>
+                </label>
+
+                <message class="net.logstash.logback.layout.LogstashLayout" />
+                <sortByTime>true</sortByTime>
+            </format>
+        </appender>
+    </springProfile>
+
+
+    <springProfile name="dev">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+
+
+    <springProfile name="!dev">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="LOKI"/>
+        </root>
+    </springProfile>
+
+
+    <logger name="org.hibernate.SQL" level="DEBUG"/>
+    <logger name="org.telegram" level="WARN"/>
+    <logger name="org.quartz" level="WARN"/>
+</configuration>

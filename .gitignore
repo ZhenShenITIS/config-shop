@@ -35,3 +35,4 @@ build/
 .gitignore
 all.txt
 .env
+CLAUDE.md
