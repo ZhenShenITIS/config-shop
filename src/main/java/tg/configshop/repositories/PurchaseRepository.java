@@ -18,6 +18,7 @@ public interface PurchaseRepository extends JpaRepository<Purchase, Long> {
             NULL AS purchaseType,
             NULL AS deviceCount,
             NULL AS durationDays,
+            NULL AS trafficGb,
             NULL AS withdrawalStatus,
             NULL AS withdrawalType
             FROM shop_db.public.top_ups where bot_user_id = :userId
@@ -38,6 +39,10 @@ public interface PurchaseRepository extends JpaRepository<Purchase, Long> {
                 WHEN 'SUBSCRIPTION' THEN s.duration_days
                 ELSE 0
             END) AS durationDays,
+            (CASE purchase_type
+                WHEN 'TRAFFIC' THEN purchases.traffic_gb
+                ELSE 0
+            END) AS trafficGb,
             NULL AS withdrawalStatus,
             NULL AS withdrawalType
             FROM shop_db.public.purchases
@@ -54,6 +59,7 @@ public interface PurchaseRepository extends JpaRepository<Purchase, Long> {
             NULL AS purchaseType,
             NULL AS deviceCount,
             NULL AS durationDays,
+            NULL AS trafficGb,
             w.status AS withdrawalStatus,
             w.type AS withdrawalType
             FROM withdrawals w

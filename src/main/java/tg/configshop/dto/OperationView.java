@@ -18,6 +18,7 @@ public interface OperationView {
     PurchaseType getPurchaseType();
     Integer getDeviceCount();
     Integer getDurationDays();
+    Integer getTrafficGb();
 
     WithdrawalStatus getWithdrawalStatus();
     WithdrawalType getWithdrawalType();

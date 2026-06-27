@@ -71,7 +71,7 @@ public class SubscriptionCallback implements Callback {
         String statusEmoji = remoteUser.isActive() ? "🟢" : "🔴";
         String dateEnd = remoteUser.prettyDateExpireAt();
         long daysLeft = remoteUser.daysLeft();
-        String temp = limitTrafficGb == 0 ? MessageText.SUBSCRIPTION.getMessageText() : MessageText.SUBSCRIPTION_TRIAL.getMessageText();
+        String temp = MessageText.SUBSCRIPTION.getMessageText();
         String text = temp.formatted(
                 callbackQuery.getFrom().getFirstName(),
                 botUser.getId(),
@@ -94,7 +94,7 @@ public class SubscriptionCallback implements Callback {
                 .keyboardRow(new InlineKeyboardRow(
                         InlineKeyboardButton.builder()
                                 .text(ButtonText.BUY_SUB.getText())
-                                .callbackData(CallbackName.BUY_SUB_MENU.getCallbackName())
+                                .callbackData(CallbackName.BUY_MENU.getCallbackName())
                                 .build(),
                         InlineKeyboardButton.builder()
                                 .text(ButtonText.DEVICES.getText())

@@ -58,6 +58,10 @@ public enum CallbackName {
     ADMIN_REFRESH_WD("adm_w_upd"),
 
     ADD_REF_PROMO("z"),
+    BUY_MENU("bm"),
+    BUY_TRAFFIC_MENU("btm"),
+    PREVIEW_TRAFFIC_PURCHASE("ptp"),
+    CONFIRM_TRAFFIC_PURCHASE("ctp"),
 
     BACK_TO_MENU("y");
 

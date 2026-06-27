@@ -148,6 +148,7 @@ public class HistoryCallback implements Callback {
             return switch (v.getPurchaseType()) {
                 case SUBSCRIPTION -> MessageText.HISTORY_SUBSCRIPTION.getMessageText().formatted(v.getDurationDays(), v.getDeviceCount());
                 case DEVICE -> MessageText.HISTORY_DEVICE.getMessageText().formatted(v.getDeviceCount());
+                case TRAFFIC -> MessageText.HISTORY_TRAFFIC.getMessageText().formatted(v.getTrafficGb());
             };
         } else {
             return switch (v.getWithdrawalStatus()) {

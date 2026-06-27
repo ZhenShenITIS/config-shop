@@ -67,7 +67,7 @@ public class BuySubMenuCallback implements Callback {
                 .keyboardRow(new InlineKeyboardRow(
                         InlineKeyboardButton.builder()
                                 .text(ButtonText.BACK.getText())
-                                .callbackData(CallbackName.SUBSCRIPTION.getCallbackName()) // Ведем назад в меню подписки
+                                .callbackData(CallbackName.BUY_MENU.getCallbackName())
                                 .build()
                 ))
                 .build();

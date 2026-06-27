@@ -52,6 +52,15 @@ public class SchedulerService {
         String jobName = String.format("sub_notify_%s_%d", type, userId);
         JobKey jobKey = JobKey.jobKey(jobName, SUBSCRIPTION_GROUP);
 
+        if (!executeAt.isAfter(Instant.now())) {
+            if (scheduler.checkExists(jobKey)) {
+                scheduler.deleteJob(jobKey);
+                log.debug("Deleted outdated job: {}", jobName);
+            }
+            log.debug("Skipping job {} because execution time {} is not in the future", jobName, executeAt);
+            return;
+        }
+
         if (scheduler.checkExists(jobKey)) {
             scheduler.deleteJob(jobKey);
             log.debug("Deleted existing job: {}", jobName);
@@ -61,7 +70,7 @@ public class SchedulerService {
                 .withIdentity(jobKey)
                 .usingJobData("userId", userId)
                 .usingJobData("type", type)
-                .usingJobData("expireAt", expireAt.toEpochMilli())
+                .usingJobData("expireAt", expireAt.toString())
                 .storeDurably(false)
                 .build();
 
@@ -103,9 +112,15 @@ public class SchedulerService {
             throws SchedulerException {
 
         String jobName = String.format("trial_check_%s_%d", type, userId);
+        JobKey jobKey = JobKey.jobKey(jobName, TRIAL_GROUP);
+
+        if (scheduler.checkExists(jobKey)) {
+            scheduler.deleteJob(jobKey);
+            log.debug("Deleted existing job: {}", jobName);
+        }
 
         JobDetail job = JobBuilder.newJob(NoTrialTrafficNotification.class)
-                .withIdentity(jobName, TRIAL_GROUP)
+                .withIdentity(jobKey)
                 .usingJobData("userId", userId)
                 .usingJobData("type", type)
                 .storeDurably(false)

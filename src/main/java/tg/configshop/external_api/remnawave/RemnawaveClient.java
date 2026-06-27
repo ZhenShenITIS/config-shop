@@ -9,7 +9,9 @@ import java.util.List;
 public interface RemnawaveClient {
     RemnawaveUserResponse createBasicUser (String username, Long telegramId);
     RemnawaveUserResponse getUser (String uuid);
-    RemnawaveUserResponse updateSubscription (String uuid, Instant expireAt, Long trafficLimitBytes, Integer hwidDeviceLimit);
+    RemnawaveUserResponse getUserByUsername (String username);
+    RemnawaveUserResponse updateSubscription (String uuid, Instant expireAt, Integer hwidDeviceLimit);
+    RemnawaveUserResponse updateTrafficLimit (String uuid, Long trafficLimitBytes);
     List<Device> getUserDevices (String uuid);
     void deleteDevice (String uuid, String hwid);
     void updateDeviceCount (String uuid, int countOfDevices);

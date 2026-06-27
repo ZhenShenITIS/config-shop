@@ -10,6 +10,7 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 import tg.configshop.constants.MessageText;
 import tg.configshop.events.ReferralRewardEvent;
+import tg.configshop.util.StringUtil;
 
 @Slf4j
 @Component
@@ -24,6 +25,9 @@ public class ReferralNotificationListener {
 
         String text = MessageText.REFERRAL_REWARD_NOTIFICATION.getMessageText().formatted(
                 event.getLevel(),
+                event.getSourceUserId(),
+                getSafeName(event.getSourceFirstName()),
+                getSafeUsername(event.getSourceUsername()),
                 event.getPurchaseAmount(),
                 event.getPercentage(),
                 event.getRewardAmount()
@@ -41,5 +45,17 @@ public class ReferralNotificationListener {
         } catch (TelegramApiException e) {
             log.error("Failed to send referral reward notification to user {}: {}", event.getReferrerId(), e.getMessage());
         }
+    }
+
+    private String getSafeName(String firstName) {
+        return firstName == null || firstName.isBlank()
+                ? "Пользователь"
+                : StringUtil.getSafeHtmlString(firstName);
+    }
+
+    private String getSafeUsername(String username) {
+        return username == null || username.isBlank()
+                ? "скрыт"
+                : StringUtil.getSafeHtmlString(username);
     }
 }

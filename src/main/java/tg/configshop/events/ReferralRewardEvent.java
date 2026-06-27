@@ -8,6 +8,8 @@ import lombok.RequiredArgsConstructor;
 public class ReferralRewardEvent {
     private final long referrerId;
     private final long sourceUserId;
+    private final String sourceFirstName;
+    private final String sourceUsername;
     private final long rewardAmount;
     private final int level;
     private final long purchaseAmount;

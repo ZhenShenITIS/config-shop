@@ -1,6 +1,5 @@
 package tg.configshop.telegram.commands.impl;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import org.springframework.stereotype.Component;
@@ -9,10 +8,8 @@ import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 import tg.configshop.aop.AdminOnly;
 import tg.configshop.constants.CommandName;
-import tg.configshop.dto.RemnawaveUser;
 import tg.configshop.model.BotUser;
 import tg.configshop.quartz.services.SchedulerService;
-import tg.configshop.services.ExternalSubscriptionService;
 import tg.configshop.services.UserService;
 import tg.configshop.telegram.commands.Command;
 
@@ -21,7 +18,6 @@ import tg.configshop.telegram.commands.Command;
 @RequiredArgsConstructor
 public class ScheduleNotificationCommand implements Command {
     private final UserService userService;
-    private final ExternalSubscriptionService externalSubscriptionService;
     private final SchedulerService schedulerService;
 
     @Override
@@ -47,8 +43,7 @@ public class ScheduleNotificationCommand implements Command {
             return;
         }
 
-        RemnawaveUser remnawaveUser = externalSubscriptionService.getExternalUser(botUser.getId());
-        schedulerService.scheduleSubscriptionNotifications(remnawaveUser.telegramId(), remnawaveUser.expireAt());
+        schedulerService.scheduleSubscriptionNotifications(botUser.getId(), botUser.getExpireAt());
         telegramClient.execute(SendMessage
                 .builder()
                 .chatId(message.getChatId())

@@ -12,6 +12,7 @@ class AutowiringSpringBeanJobFactory extends SpringBeanJobFactory
 
     @Override
     public void setApplicationContext(ApplicationContext context) {
+        super.setApplicationContext(context);
         beanFactory = context.getAutowireCapableBeanFactory();
     }
 

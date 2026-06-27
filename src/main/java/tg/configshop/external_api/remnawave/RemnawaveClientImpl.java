@@ -1,6 +1,7 @@
 package tg.configshop.external_api.remnawave;
 
-import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import tg.configshop.external_api.remnawave.dto.device.AddDeviceRequest;
@@ -10,6 +11,7 @@ import tg.configshop.external_api.remnawave.dto.device.DeviceRootResponse;
 import tg.configshop.external_api.remnawave.dto.squads.InternalSquad;
 import tg.configshop.external_api.remnawave.dto.squads.InternalSquadsRootResponse;
 import tg.configshop.external_api.remnawave.dto.user.RemnaveUserUpdateRequest;
+import tg.configshop.external_api.remnawave.dto.user.RemnawaveTrafficLimitUpdateRequest;
 import tg.configshop.external_api.remnawave.dto.user.RemnawaveUserRequest;
 import tg.configshop.external_api.remnawave.dto.user.RemnawaveUserResponse;
 import tg.configshop.external_api.remnawave.dto.user.RemnawaveUserRootResponse;
@@ -19,20 +21,22 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Component
-@AllArgsConstructor
+@RequiredArgsConstructor
 public class RemnawaveClientImpl implements RemnawaveClient {
     private final RestClient remnawaveRestClient;
 
     private final long TRIAL_PERIOD_IN_SECONDS = 432000;
-    private final long TRIAL_TRAFFIC_IN_BYTES = 50L * 1024 * 1024 * 1024;
     private final int TRIAL_HWID_DEVICE_LIMIT = 2;
+
+    @Value("${FREE_TRAFFIC_GB}")
+    private long freeTrafficGb;
 
     @Override
     // TODO bring this logic to the service
     public RemnawaveUserResponse createBasicUser(String username, Long telegramId) {
         return remnawaveRestClient.post()
                 .uri("/api/users")
-                .body(new RemnawaveUserRequest(username, Instant.now().plusSeconds(TRIAL_PERIOD_IN_SECONDS), telegramId, TRIAL_TRAFFIC_IN_BYTES, TRIAL_HWID_DEVICE_LIMIT, getInternalSquads()))
+                .body(new RemnawaveUserRequest(username, Instant.now().plusSeconds(TRIAL_PERIOD_IN_SECONDS), telegramId, freeTrafficGb * 1024L * 1024 * 1024, TRIAL_HWID_DEVICE_LIMIT, getInternalSquads()))
                 .retrieve()
                 .body(RemnawaveUserRootResponse.class).response();
     }
@@ -47,10 +51,30 @@ public class RemnawaveClientImpl implements RemnawaveClient {
     }
 
     @Override
-    public RemnawaveUserResponse updateSubscription(String uuid, Instant expireAt, Long trafficLimitBytes, Integer hwidDeviceLimit) {
+    public RemnawaveUserResponse getUserByUsername(String username) {
+        return remnawaveRestClient.get()
+                .uri("/api/users/by-username/{username}", username)
+                .retrieve()
+                .body(RemnawaveUserRootResponse.class)
+                .response();
+    }
+
+    @Override
+    public RemnawaveUserResponse updateSubscription(String uuid, Instant expireAt, Integer hwidDeviceLimit) {
         return remnawaveRestClient.patch()
                 .uri("/api/users")
-                .body(new RemnaveUserUpdateRequest(uuid, expireAt, trafficLimitBytes, hwidDeviceLimit))
+                .body(new RemnaveUserUpdateRequest(uuid, expireAt, hwidDeviceLimit))
+                .retrieve()
+                .body(RemnawaveUserRootResponse.class)
+                .response();
+
+    }
+
+    @Override
+    public RemnawaveUserResponse updateTrafficLimit(String uuid, Long trafficLimitBytes) {
+        return remnawaveRestClient.patch()
+                .uri("/api/users")
+                .body(new RemnawaveTrafficLimitUpdateRequest(uuid, trafficLimitBytes))
                 .retrieve()
                 .body(RemnawaveUserRootResponse.class)
                 .response();

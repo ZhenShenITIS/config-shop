@@ -40,7 +40,8 @@ public class Purchase {
     private Instant createdAt = Instant.now();
     @Builder.Default
     @Enumerated(EnumType.STRING)
-    // DEVICE, SUBSCRIPTION
+    // DEVICE, SUBSCRIPTION, TRAFFIC
     private PurchaseType purchaseType = PurchaseType.SUBSCRIPTION;
     private Integer deviceCount;
+    private Integer trafficGb;
 }

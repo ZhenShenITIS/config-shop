@@ -66,6 +66,8 @@ public class PaymentConfirmedListener {
                     eventPublisher.publishEvent(new ReferralRewardEvent(
                             referrerId,
                             buyerId,
+                            buyer.getFirstName(),
+                            buyer.getUsername(),
                             reward,
                             level,
                             purchaseAmount,

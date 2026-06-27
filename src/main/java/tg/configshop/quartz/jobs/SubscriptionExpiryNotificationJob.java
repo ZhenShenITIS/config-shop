@@ -22,6 +22,7 @@ import tg.configshop.quartz.constants.ExpirySubNotificationType;
 import tg.configshop.repositories.BotUserRepository;
 import tg.configshop.util.DateUtil;
 
+import java.time.Duration;
 import java.time.Instant;
 
 @Slf4j
@@ -41,7 +42,7 @@ public class SubscriptionExpiryNotificationJob implements Job {
 
         Long userId = dataMap.getLongValue("userId");
         ExpirySubNotificationType notificationType = ExpirySubNotificationType.valueOf(dataMap.getString("type"));
-        Instant targetExpireAt = Instant.ofEpochMilli(dataMap.getLong("expireAt"));
+        Instant targetExpireAt = readExpireAt(dataMap);
 
         log.info("Executing notification job for user {} type {}", userId, notificationType);
 
@@ -51,8 +52,9 @@ public class SubscriptionExpiryNotificationJob implements Job {
             return;
         }
 
-        if (!user.getExpireAt().equals(targetExpireAt)) {
-            log.info("User {} expireAt changed, skipping outdated notification", userId);
+        if (!isSameExpireAt(user.getExpireAt(), targetExpireAt)) {
+            log.info("User {} expireAt changed from {} to {}, skipping outdated notification",
+                    userId, targetExpireAt, user.getExpireAt());
             return;
         }
 
@@ -91,6 +93,28 @@ public class SubscriptionExpiryNotificationJob implements Job {
         } catch (TelegramApiException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private Instant readExpireAt(JobDataMap dataMap) throws JobExecutionException {
+        Object expireAt = dataMap.get("expireAt");
+        if (expireAt instanceof Number number) {
+            return Instant.ofEpochMilli(number.longValue());
+        }
+        if (expireAt instanceof String value) {
+            try {
+                return Instant.parse(value);
+            } catch (Exception e) {
+                throw new JobExecutionException("Invalid expireAt value: " + value, e);
+            }
+        }
+        throw new JobExecutionException("Missing or invalid expireAt value");
+    }
+
+    private boolean isSameExpireAt(Instant currentExpireAt, Instant scheduledExpireAt) {
+        if (currentExpireAt == null || scheduledExpireAt == null) {
+            return false;
+        }
+        return Duration.between(currentExpireAt, scheduledExpireAt).abs().compareTo(Duration.ofSeconds(1)) <= 0;
     }
 
 }
