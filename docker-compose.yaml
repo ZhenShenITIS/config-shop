@@ -13,6 +13,12 @@ services:
     restart: always
     ports:
       - "${SERVER_PORT}:${SERVER_PORT}"
+    networks:
+      default:
+      remnawave-network:
+        aliases:
+          - bot
+          - config-shop
 
   db:
     image: postgres:17-alpine
@@ -47,3 +53,8 @@ services:
 volumes:
   pg_data:
   grafana_data:
+
+networks:
+  remnawave-network:
+    name: remnawave-network
+    external: true
