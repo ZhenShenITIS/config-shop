@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import tg.configshop.dto.RemnawaveLimitedWebhookEvent;
 import tg.configshop.external_api.remnawave.RemnawaveClient;
@@ -37,7 +38,7 @@ public class ExternalTrafficServiceImpl implements ExternalTrafficService {
     private long limitGraceBytes;
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void handleLimitedWebhook(RemnawaveLimitedWebhookEvent event) {
         String remnawaveUuid = event.remnawaveUuid();
         BotUser botUser = getBotUserWithLock(remnawaveUuid);
@@ -68,7 +69,7 @@ public class ExternalTrafficServiceImpl implements ExternalTrafficService {
     }
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void applyTrafficPurchase(String remnawaveUuid, int trafficGb) {
         BotUser botUser = getBotUserWithLock(remnawaveUuid);
         RemnawaveUserResponse remnawaveUser = remnawaveClient.getUser(remnawaveUuid);
