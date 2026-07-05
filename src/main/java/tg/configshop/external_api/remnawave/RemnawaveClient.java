@@ -12,6 +12,8 @@ public interface RemnawaveClient {
     RemnawaveUserResponse getUserByUsername (String username);
     RemnawaveUserResponse updateSubscription (String uuid, Instant expireAt, Integer hwidDeviceLimit);
     RemnawaveUserResponse updateTrafficLimit (String uuid, Long trafficLimitBytes);
+    RemnawaveUserResponse resetUserTraffic (String uuid);
+    RemnawaveUserResponse updateTrafficLimitAndInternalSquads (String uuid, Long trafficLimitBytes, List<String> activeInternalSquads);
     List<Device> getUserDevices (String uuid);
     void deleteDevice (String uuid, String hwid);
     void updateDeviceCount (String uuid, int countOfDevices);

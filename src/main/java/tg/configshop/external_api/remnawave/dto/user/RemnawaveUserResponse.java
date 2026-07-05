@@ -2,8 +2,10 @@ package tg.configshop.external_api.remnawave.dto.user;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Builder;
+import tg.configshop.external_api.remnawave.dto.squads.InternalSquad;
 
 import java.time.Instant;
+import java.util.List;
 
 @Builder
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -16,6 +18,7 @@ public record RemnawaveUserResponse(
         Integer hwidDeviceLimit,
         UserTraffic userTraffic,
         Instant expireAt,
-        String subscriptionUrl
+        String subscriptionUrl,
+        List<InternalSquad> activeInternalSquads
 ) {
 }

@@ -14,7 +14,13 @@ public interface BotUserRepository extends JpaRepository<BotUser, Long> {
 
     List<BotUser> findByUsernameIgnoreCase(String username);
 
+    Optional<BotUser> findByRemnawaveUuid(String remnawaveUuid);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT u FROM BotUser u WHERE u.id = :id")
     Optional<BotUser> findByIdWithLock(Long id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT u FROM BotUser u WHERE u.remnawaveUuid = :remnawaveUuid")
+    Optional<BotUser> findByRemnawaveUuidWithLock(String remnawaveUuid);
 }

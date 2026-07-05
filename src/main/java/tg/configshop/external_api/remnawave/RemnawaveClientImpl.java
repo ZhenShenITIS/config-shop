@@ -10,6 +10,7 @@ import tg.configshop.external_api.remnawave.dto.device.Device;
 import tg.configshop.external_api.remnawave.dto.device.DeviceRootResponse;
 import tg.configshop.external_api.remnawave.dto.squads.InternalSquad;
 import tg.configshop.external_api.remnawave.dto.squads.InternalSquadsRootResponse;
+import tg.configshop.external_api.remnawave.dto.user.RemnawaveTrafficLimitAndInternalSquadsUpdateRequest;
 import tg.configshop.external_api.remnawave.dto.user.RemnaveUserUpdateRequest;
 import tg.configshop.external_api.remnawave.dto.user.RemnawaveTrafficLimitUpdateRequest;
 import tg.configshop.external_api.remnawave.dto.user.RemnawaveUserRequest;
@@ -79,6 +80,25 @@ public class RemnawaveClientImpl implements RemnawaveClient {
                 .body(RemnawaveUserRootResponse.class)
                 .response();
 
+    }
+
+    @Override
+    public RemnawaveUserResponse resetUserTraffic(String uuid) {
+        return remnawaveRestClient.post()
+                .uri("/api/users/{uuid}/actions/reset-traffic", uuid)
+                .retrieve()
+                .body(RemnawaveUserRootResponse.class)
+                .response();
+    }
+
+    @Override
+    public RemnawaveUserResponse updateTrafficLimitAndInternalSquads(String uuid, Long trafficLimitBytes, List<String> activeInternalSquads) {
+        return remnawaveRestClient.patch()
+                .uri("/api/users")
+                .body(new RemnawaveTrafficLimitAndInternalSquadsUpdateRequest(uuid, trafficLimitBytes, activeInternalSquads))
+                .retrieve()
+                .body(RemnawaveUserRootResponse.class)
+                .response();
     }
 
     @Override
