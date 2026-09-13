@@ -10,6 +10,7 @@ import tg.configshop.events.SubscriptionPaidEvent;
 import tg.configshop.exceptions.subscription.InsufficientBalanceException;
 import tg.configshop.exceptions.subscription.SubscriptionNotFoundException;
 import tg.configshop.external_api.remnawave.RemnawaveClient;
+import tg.configshop.external_api.remnawave.config.RemnawaveApiVersion;
 import tg.configshop.model.BotUser;
 import tg.configshop.model.Purchase;
 import tg.configshop.model.Subscription;
@@ -31,6 +32,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     private final RemnawaveClient remnawaveClient;
     private final PurchaseRepository purchaseRepository;
     private final ApplicationEventPublisher applicationEventPublisher;
+    private final RemnawaveApiVersion apiVersion;
     @Value("${MIN_DEVICE_COUNT}")
     private int MIN_DEVICE_COUNT;
 
@@ -73,6 +75,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         BotUser botUser = userService.getUser(userId);
         Subscription subscription = subscriptionRepository.findById(subscriptionId).orElseThrow();
         checkBalance(botUser, subscription);
+        apiVersion.select(botUser.remnawaveRef());
 
         Instant newExpired = getNewExpired(botUser, subscription);
         log.info("Updating sub for userId={}, oldExpire={}, newExpire={}",

@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tg.configshop.constants.PurchaseType;
 import tg.configshop.events.TrafficPaidEvent;
+import tg.configshop.external_api.remnawave.config.RemnawaveApiVersion;
 import tg.configshop.exceptions.subscription.InsufficientBalanceException;
 import tg.configshop.exceptions.traffic.TrafficPackageNotFoundException;
 import tg.configshop.model.BotUser;
@@ -30,6 +31,7 @@ public class TrafficPackageServiceImpl implements TrafficPackageService {
     private final UserService userService;
     private final PurchaseRepository purchaseRepository;
     private final ApplicationEventPublisher applicationEventPublisher;
+    private final RemnawaveApiVersion apiVersion;
 
     @Value("${TRAFFIC_PACKAGE_10_PRICE}")
     private long trafficPackage10Price;
@@ -87,6 +89,7 @@ public class TrafficPackageServiceImpl implements TrafficPackageService {
             throw new InsufficientBalanceException();
         }
 
+        apiVersion.select(user.remnawaveRef());
         userService.decreaseBalance(userId, trafficPackage.getCost());
         purchaseRepository.save(Purchase.builder()
                 .purchaseType(PurchaseType.TRAFFIC)
@@ -94,7 +97,7 @@ public class TrafficPackageServiceImpl implements TrafficPackageService {
                 .paidAmount(trafficPackage.getCost())
                 .trafficGb(trafficPackage.getTrafficGb())
                 .build());
-        applicationEventPublisher.publishEvent(new TrafficPaidEvent(user.getRemnawaveUuid(), trafficPackage.getTrafficGb()));
+        applicationEventPublisher.publishEvent(new TrafficPaidEvent(user.remnawaveRef(), trafficPackage.getTrafficGb()));
 
         log.info("User {} bought {} GB traffic", userId, trafficPackage.getTrafficGb());
     }

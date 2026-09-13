@@ -7,6 +7,7 @@ import java.time.Instant;
 @Builder
 public record RemnawaveUser(
         String uuid,
+        Long id,
         String username,
         long telegramId,
         String shortUuid,

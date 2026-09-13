@@ -11,6 +11,7 @@ import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record RemnawaveUserResponse(
         String uuid,
+        Long id,
         String username,
         Long telegramId,
         String shortUuid,
