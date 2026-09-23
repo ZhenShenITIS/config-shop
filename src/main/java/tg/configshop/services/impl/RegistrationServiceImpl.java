@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.objects.User;
 import org.springframework.web.client.RestClientResponseException;
 import tg.configshop.external_api.remnawave.RemnawaveClient;
+import tg.configshop.external_api.remnawave.config.RemnawaveApiVersion;
 import tg.configshop.external_api.remnawave.dto.user.RemnawaveUserResponse;
 import tg.configshop.model.BotUser;
 import tg.configshop.quartz.services.SchedulerService;
@@ -21,6 +22,7 @@ public class RegistrationServiceImpl implements RegistrationService {
     private final ReferralService referralService;
     private final RemnawaveClient remnawaveClient;
     private final SchedulerService schedulerService;
+    private final RemnawaveApiVersion apiVersion;
 
     @Override
     public boolean isRegistered(Long userId) {
@@ -32,6 +34,9 @@ public class RegistrationServiceImpl implements RegistrationService {
         String remnawaveUsername = user.getId().toString();
         RemnawaveRegistrationResult remnawaveRegistration = getOrCreateRemnawaveUser(remnawaveUsername, user.getId());
         RemnawaveUserResponse remnaUser = remnawaveRegistration.user();
+        if (remnaUser == null || remnaUser.id() == null || remnaUser.id() <= 0) {
+            throw new IllegalStateException("Remnawave did not return a positive user ID");
+        }
         BotUser botUser = BotUser
                 .builder()
                 .username(user.getUserName())
@@ -39,9 +44,11 @@ public class RegistrationServiceImpl implements RegistrationService {
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
                 .remnawaveUuid(remnaUser.uuid())
+                .remnawaveId(remnaUser.id())
                 .shortId(remnaUser.shortUuid())
                 .expireAt(remnaUser.expireAt())
                 .build();
+        apiVersion.select(botUser.remnawaveRef());
         botUserRepository.save(botUser);
         if (referrerId != null) {
             referralService.createReferral(referrerId, user.getId());

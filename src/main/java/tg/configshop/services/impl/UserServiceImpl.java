@@ -13,6 +13,7 @@ import tg.configshop.repositories.TopUpRepository;
 import tg.configshop.services.UserService;
 
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -61,6 +62,9 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public void syncRemnawaveUserWithLocalUser(RemnawaveUserResponse userResponse, BotUser botUser) {
+        if (botUser.getRemnawaveId() != null && !Objects.equals(botUser.getRemnawaveId(), userResponse.id())) {
+            throw new IllegalStateException("Conflicting Remnawave ID for local user " + botUser.getId());
+        }
         botUser.setExpireAt(userResponse.expireAt());
         botUserRepository.save(botUser);
     }

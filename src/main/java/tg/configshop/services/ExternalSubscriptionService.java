@@ -19,8 +19,7 @@ public class ExternalSubscriptionService {
 
     public RemnawaveUser getExternalUserWithCryptLinkAndSync (long userId) {
         BotUser botUser = userService.getUser(userId);
-        String remnawaveUuid = botUser.getRemnawaveUuid();
-        RemnawaveUserResponse response = remnawaveClient.getUser(remnawaveUuid);
+        RemnawaveUserResponse response = remnawaveClient.getUser(botUser.remnawaveRef());
         userService.syncRemnawaveUserWithLocalUser(response, botUser);
         String subLink = null;
         try {
@@ -36,6 +35,7 @@ public class ExternalSubscriptionService {
                 .hwidDeviceLimit(response.hwidDeviceLimit())
                 .userTraffic(new UserTrafficInGigabytes(response.userTraffic()))
                 .uuid(response.uuid())
+                .id(response.id())
                 .prettyDateExpireAt(DateUtil.getDateEndSubscription(botUser))
                 .isActive(!DateUtil.isExpired(botUser))
                 .shortUuid(response.shortUuid())
@@ -47,8 +47,7 @@ public class ExternalSubscriptionService {
 
     public RemnawaveUser getExternalUser (long userId) {
         BotUser botUser = userService.getUser(userId);
-        String remnawaveUuid = botUser.getRemnawaveUuid();
-        RemnawaveUserResponse response = remnawaveClient.getUser(remnawaveUuid);
+        RemnawaveUserResponse response = remnawaveClient.getUser(botUser.remnawaveRef());
         return RemnawaveUser
                 .builder()
                 .expireAt(response.expireAt())
@@ -56,6 +55,7 @@ public class ExternalSubscriptionService {
                 .hwidDeviceLimit(response.hwidDeviceLimit())
                 .userTraffic(new UserTrafficInGigabytes(response.userTraffic()))
                 .uuid(response.uuid())
+                .id(response.id())
                 .prettyDateExpireAt(DateUtil.getDateEndSubscription(botUser))
                 .isActive(!DateUtil.isExpired(botUser))
                 .shortUuid(response.shortUuid())

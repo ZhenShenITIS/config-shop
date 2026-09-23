@@ -8,6 +8,7 @@ import lombok.Getter;
 public enum CommandName {
     UNKNOWN("null"),
     FIND_USER("/find_user"),
+    MIGRATE_REMNAWAVE_IDS("/migrate_remnawave_ids"),
     BROADCAST("/broadcast"),
     SCHEDULE_NOTIFICATION("/schedule_notification"),
     TOP_UP("/top_up"),

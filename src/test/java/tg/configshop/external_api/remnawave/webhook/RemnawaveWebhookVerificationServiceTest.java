@@ -32,7 +32,7 @@ class RemnawaveWebhookVerificationServiceTest {
 
         assertTrue(event.isPresent());
         assertEquals("user.limited", event.get().event());
-        assertEquals("9d96d9d2-9b88-4f8f-8c1c-3e8f7d84206d", event.get().remnawaveUuid());
+        assertEquals("9d96d9d2-9b88-4f8f-8c1c-3e8f7d84206d", event.get().user().uuid());
         assertEquals(1073741824L, event.get().trafficLimitBytes());
         assertEquals(1073741824L, event.get().usedTrafficBytes());
         assertEquals(2, event.get().activeInternalSquadUuids().size());
@@ -56,6 +56,42 @@ class RemnawaveWebhookVerificationServiceTest {
         Optional<RemnawaveLimitedWebhookEvent> event = service.verifyAndExtractLimitedEvent(rawBody, signature);
 
         assertFalse(event.isPresent());
+    }
+
+    @Test
+    void acceptsV2PayloadWithBothIdentifiers() {
+        byte[] body = limitedPayload().replace("\"data\":{", "\"data\":{\"id\":9876543210,")
+                .getBytes(StandardCharsets.UTF_8);
+        RemnawaveLimitedWebhookEvent event = service.verifyAndExtractLimitedEvent(body, sign(body)).orElseThrow();
+        assertEquals(9876543210L, event.user().id());
+        assertEquals("9d96d9d2-9b88-4f8f-8c1c-3e8f7d84206d", event.user().uuid());
+    }
+
+    @Test
+    void acceptsV3PayloadWithoutUuid() {
+        byte[] body = limitedPayload().replace(
+                "\"uuid\":\"9d96d9d2-9b88-4f8f-8c1c-3e8f7d84206d\"", "\"id\":9876543210")
+                .getBytes(StandardCharsets.UTF_8);
+        RemnawaveLimitedWebhookEvent event = service.verifyAndExtractLimitedEvent(body, sign(body)).orElseThrow();
+        assertEquals(9876543210L, event.user().id());
+        assertEquals(null, event.user().uuid());
+    }
+
+    @Test
+    void rejectsLimitedEventWithoutIdentifier() {
+        byte[] body = limitedPayload().replace(
+                "\"uuid\":\"9d96d9d2-9b88-4f8f-8c1c-3e8f7d84206d\",", "")
+                .getBytes(StandardCharsets.UTF_8);
+        assertThrows(InvalidRemnawaveWebhookPayloadException.class,
+                () -> service.verifyAndExtractLimitedEvent(body, sign(body)));
+    }
+
+    @Test
+    void rejectsNonPositiveId() {
+        byte[] body = limitedPayload().replace("\"data\":{", "\"data\":{\"id\":0,")
+                .getBytes(StandardCharsets.UTF_8);
+        assertThrows(InvalidRemnawaveWebhookPayloadException.class,
+                () -> service.verifyAndExtractLimitedEvent(body, sign(body)));
     }
 
     private static String limitedPayload() {

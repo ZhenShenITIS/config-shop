@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tg.configshop.constants.PurchaseType;
+import tg.configshop.external_api.remnawave.config.RemnawaveApiVersion;
 import tg.configshop.exceptions.devices.TooManyDevicesException;
 import tg.configshop.exceptions.subscription.InsufficientBalanceException;
 import tg.configshop.model.BotUser;
@@ -16,6 +17,7 @@ public class DevicePurchaseService {
     private final DeviceService deviceService;
     private final UserService userService;
     private final PurchaseRepository purchaseRepository;
+    private final RemnawaveApiVersion apiVersion;
 
 
     @Transactional(rollbackFor = Exception.class)
@@ -25,6 +27,7 @@ public class DevicePurchaseService {
         if (user.getBalance() < totalPrice) {
             throw new InsufficientBalanceException();
         }
+        apiVersion.select(user.remnawaveRef());
         userService.decreaseBalance(userId, totalPrice);
         deviceService.addDeviceById(userId, deviceCount);
         purchaseRepository.save(Purchase

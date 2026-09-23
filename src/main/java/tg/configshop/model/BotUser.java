@@ -10,6 +10,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import tg.configshop.external_api.remnawave.RemnawaveUserRef;
 
 import java.time.Instant;
 
@@ -25,6 +26,8 @@ public class BotUser {
     private Long id;
     @Column(name = "remnawave_uuid")
     private String remnawaveUuid;
+    @Column(name = "remnawave_id")
+    private Long remnawaveId;
     private String firstName;
     private String lastName;
     private String username;
@@ -42,5 +45,9 @@ public class BotUser {
     private Instant expireAt;
     @Builder.Default
     private Instant createdAt = Instant.now();
+
+    public RemnawaveUserRef remnawaveRef() {
+        return new RemnawaveUserRef(remnawaveUuid, remnawaveId);
+    }
 
 }

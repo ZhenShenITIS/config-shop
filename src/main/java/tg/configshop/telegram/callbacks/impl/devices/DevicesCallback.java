@@ -40,7 +40,7 @@ public class DevicesCallback implements Callback {
         BotUser botUser = userService.getUser(userId);
 
         List<Device> devices = deviceService.getDevicesByUserId(userId);
-        RemnawaveUserResponse remoteUser = remnawaveClient.getUser(botUser.getRemnawaveUuid());
+        RemnawaveUserResponse remoteUser = remnawaveClient.getUser(botUser.remnawaveRef());
         int maxDevices = remoteUser.hwidDeviceLimit();
 
         String devicesText;

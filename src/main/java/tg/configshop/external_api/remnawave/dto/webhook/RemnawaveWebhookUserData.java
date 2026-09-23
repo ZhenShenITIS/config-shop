@@ -8,6 +8,7 @@ import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record RemnawaveWebhookUserData(
         String uuid,
+        Long id,
         Long trafficLimitBytes,
         RemnawaveWebhookUserTraffic userTraffic,
         List<InternalSquad> activeInternalSquads

@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import tg.configshop.exceptions.devices.TooManyDevicesException;
 import tg.configshop.external_api.remnawave.RemnawaveClient;
+import tg.configshop.external_api.remnawave.RemnawaveUserRef;
 import tg.configshop.external_api.remnawave.dto.device.Device;
 import tg.configshop.external_api.remnawave.dto.user.RemnawaveUserResponse;
 
@@ -17,24 +18,24 @@ public class DeviceService {
     private final SubscriptionService subscriptionService;
 
     public List<Device> getDevicesByUserId(Long userId) {
-        String uuid = userService.getUser(userId).getRemnawaveUuid();
-        return remnawaveClient.getUserDevices(uuid);
+        RemnawaveUserRef user = userService.getUser(userId).remnawaveRef();
+        return remnawaveClient.getUserDevices(user);
     }
 
     public void deleteDeviceById(Long userId, String hwid) {
-        String uuid = userService.getUser(userId).getRemnawaveUuid();
-        remnawaveClient.deleteDevice(uuid, hwid);
+        RemnawaveUserRef user = userService.getUser(userId).remnawaveRef();
+        remnawaveClient.deleteDevice(user, hwid);
     }
 
     public void addDeviceById(Long userId, int deviceToAdd) throws TooManyDevicesException {
-        String uuid = userService.getUser(userId).getRemnawaveUuid();
-        RemnawaveUserResponse response = remnawaveClient.getUser(uuid);
+        RemnawaveUserRef user = userService.getUser(userId).remnawaveRef();
+        RemnawaveUserResponse response = remnawaveClient.getUser(user);
         int currentDeviceCount = response.hwidDeviceLimit();
         int newDeviceCount = currentDeviceCount + deviceToAdd;
         if (newDeviceCount > subscriptionService.getMaxDeviceCount()) {
             throw new TooManyDevicesException("Cannot add more devices than the maximum allowed.");
         }
-        remnawaveClient.updateDeviceCount(uuid, newDeviceCount);
+        remnawaveClient.updateDeviceCount(user, newDeviceCount);
     }
 
 }

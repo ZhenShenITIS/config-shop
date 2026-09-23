@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import tg.configshop.dto.RemnawaveLimitedWebhookEvent;
+import tg.configshop.external_api.remnawave.RemnawaveUserRef;
 import tg.configshop.external_api.remnawave.dto.squads.InternalSquad;
 import tg.configshop.external_api.remnawave.dto.webhook.RemnawaveWebhookPayload;
 import tg.configshop.external_api.remnawave.dto.webhook.RemnawaveWebhookUserData;
@@ -40,13 +41,17 @@ public class RemnawaveWebhookVerificationService {
         }
 
         RemnawaveWebhookPayload payload = parsePayload(rawBody);
+        if (payload == null) {
+            throw new InvalidRemnawaveWebhookPayloadException("Missing webhook payload", null);
+        }
         if (!USER_SCOPE.equals(payload.scope()) || !USER_LIMITED_EVENT.equals(payload.event())) {
             return Optional.empty();
         }
 
         RemnawaveWebhookUserData data = payload.data();
-        if (data == null) {
-            return Optional.empty();
+        if (data == null || ((data.uuid() == null || data.uuid().isBlank()) && data.id() == null)
+                || (data.id() != null && data.id() <= 0)) {
+            throw new InvalidRemnawaveWebhookPayloadException("Missing or invalid Remnawave user identifier", null);
         }
 
         Long usedTrafficBytes = data.userTraffic() == null ? null : data.userTraffic().usedTrafficBytes();
@@ -58,7 +63,7 @@ public class RemnawaveWebhookVerificationService {
 
         return Optional.of(new RemnawaveLimitedWebhookEvent(
                 payload.event(),
-                data.uuid(),
+                new RemnawaveUserRef(data.uuid(), data.id()),
                 data.trafficLimitBytes(),
                 usedTrafficBytes,
                 activeInternalSquadUuids

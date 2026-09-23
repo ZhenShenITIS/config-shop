@@ -8,15 +8,15 @@ import java.util.List;
 
 public interface RemnawaveClient {
     RemnawaveUserResponse createBasicUser (String username, Long telegramId);
-    RemnawaveUserResponse getUser (String uuid);
+    RemnawaveUserResponse getUser (RemnawaveUserRef user);
     RemnawaveUserResponse getUserByUsername (String username);
-    RemnawaveUserResponse updateSubscription (String uuid, Instant expireAt, Integer hwidDeviceLimit);
-    RemnawaveUserResponse updateTrafficLimit (String uuid, Long trafficLimitBytes);
-    RemnawaveUserResponse resetUserTraffic (String uuid);
-    RemnawaveUserResponse updateTrafficLimitAndInternalSquads (String uuid, Long trafficLimitBytes, List<String> activeInternalSquads);
-    List<Device> getUserDevices (String uuid);
-    void deleteDevice (String uuid, String hwid);
-    void updateDeviceCount (String uuid, int countOfDevices);
+    RemnawaveUserResponse updateSubscription (RemnawaveUserRef user, Instant expireAt, Integer hwidDeviceLimit);
+    RemnawaveUserResponse updateTrafficLimit (RemnawaveUserRef user, Long trafficLimitBytes);
+    RemnawaveUserResponse resetUserTraffic (RemnawaveUserRef user);
+    RemnawaveUserResponse updateTrafficLimitAndInternalSquads (RemnawaveUserRef user, Long trafficLimitBytes, List<String> activeInternalSquads);
+    List<Device> getUserDevices (RemnawaveUserRef user);
+    void deleteDevice (RemnawaveUserRef user, String hwid);
+    void updateDeviceCount (RemnawaveUserRef user, int countOfDevices);
 
 
 }

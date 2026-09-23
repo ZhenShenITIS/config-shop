@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import tg.configshop.external_api.remnawave.config.RemnawaveApiVersion;
 import tg.configshop.external_api.remnawave.dto.device.AddDeviceRequest;
 import tg.configshop.external_api.remnawave.dto.device.DeleteDeviceRequest;
 import tg.configshop.external_api.remnawave.dto.device.Device;
@@ -25,6 +26,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class RemnawaveClientImpl implements RemnawaveClient {
     private final RestClient remnawaveRestClient;
+    private final RemnawaveApiVersion apiVersion;
 
     private final long TRIAL_PERIOD_IN_SECONDS = 432000;
     private final int TRIAL_HWID_DEVICE_LIMIT = 2;
@@ -43,9 +45,9 @@ public class RemnawaveClientImpl implements RemnawaveClient {
     }
 
     @Override
-    public RemnawaveUserResponse getUser(String uuid) {
+    public RemnawaveUserResponse getUser(RemnawaveUserRef user) {
         return remnawaveRestClient.get()
-                .uri("/api/users/{uuid}", uuid)
+                .uri("/api/users/{identifier}", apiVersion.identifier(user))
                 .retrieve()
                 .body(RemnawaveUserRootResponse.class)
                 .response();
@@ -61,10 +63,11 @@ public class RemnawaveClientImpl implements RemnawaveClient {
     }
 
     @Override
-    public RemnawaveUserResponse updateSubscription(String uuid, Instant expireAt, Integer hwidDeviceLimit) {
+    public RemnawaveUserResponse updateSubscription(RemnawaveUserRef user, Instant expireAt, Integer hwidDeviceLimit) {
+        RemnawaveUserRef selected = apiVersion.select(user);
         return remnawaveRestClient.patch()
                 .uri("/api/users")
-                .body(new RemnaveUserUpdateRequest(uuid, expireAt, hwidDeviceLimit))
+                .body(new RemnaveUserUpdateRequest(selected.uuid(), selected.id(), expireAt, hwidDeviceLimit))
                 .retrieve()
                 .body(RemnawaveUserRootResponse.class)
                 .response();
@@ -72,10 +75,11 @@ public class RemnawaveClientImpl implements RemnawaveClient {
     }
 
     @Override
-    public RemnawaveUserResponse updateTrafficLimit(String uuid, Long trafficLimitBytes) {
+    public RemnawaveUserResponse updateTrafficLimit(RemnawaveUserRef user, Long trafficLimitBytes) {
+        RemnawaveUserRef selected = apiVersion.select(user);
         return remnawaveRestClient.patch()
                 .uri("/api/users")
-                .body(new RemnawaveTrafficLimitUpdateRequest(uuid, trafficLimitBytes))
+                .body(new RemnawaveTrafficLimitUpdateRequest(selected.uuid(), selected.id(), trafficLimitBytes))
                 .retrieve()
                 .body(RemnawaveUserRootResponse.class)
                 .response();
@@ -83,28 +87,29 @@ public class RemnawaveClientImpl implements RemnawaveClient {
     }
 
     @Override
-    public RemnawaveUserResponse resetUserTraffic(String uuid) {
+    public RemnawaveUserResponse resetUserTraffic(RemnawaveUserRef user) {
         return remnawaveRestClient.post()
-                .uri("/api/users/{uuid}/actions/reset-traffic", uuid)
+                .uri("/api/users/{identifier}/actions/reset-traffic", apiVersion.identifier(user))
                 .retrieve()
                 .body(RemnawaveUserRootResponse.class)
                 .response();
     }
 
     @Override
-    public RemnawaveUserResponse updateTrafficLimitAndInternalSquads(String uuid, Long trafficLimitBytes, List<String> activeInternalSquads) {
+    public RemnawaveUserResponse updateTrafficLimitAndInternalSquads(RemnawaveUserRef user, Long trafficLimitBytes, List<String> activeInternalSquads) {
+        RemnawaveUserRef selected = apiVersion.select(user);
         return remnawaveRestClient.patch()
                 .uri("/api/users")
-                .body(new RemnawaveTrafficLimitAndInternalSquadsUpdateRequest(uuid, trafficLimitBytes, activeInternalSquads))
+                .body(new RemnawaveTrafficLimitAndInternalSquadsUpdateRequest(selected.uuid(), selected.id(), trafficLimitBytes, activeInternalSquads))
                 .retrieve()
                 .body(RemnawaveUserRootResponse.class)
                 .response();
     }
 
     @Override
-    public List<Device> getUserDevices(String uuid) {
+    public List<Device> getUserDevices(RemnawaveUserRef user) {
         return remnawaveRestClient.get()
-                .uri("/api/hwid/devices/{uuid}", uuid)
+                .uri("/api/hwid/devices/{identifier}", apiVersion.identifier(user))
                 .retrieve()
                 .body(DeviceRootResponse.class)
                 .response()
@@ -112,20 +117,22 @@ public class RemnawaveClientImpl implements RemnawaveClient {
     }
 
     @Override
-    public void deleteDevice(String uuid, String hwid) {
+    public void deleteDevice(RemnawaveUserRef user, String hwid) {
+        RemnawaveUserRef selected = apiVersion.select(user);
         remnawaveRestClient.post()
                 .uri("/api/hwid/devices/delete")
-                .body(new DeleteDeviceRequest(uuid, hwid))
+                .body(new DeleteDeviceRequest(selected.uuid(), selected.id(), hwid))
                 .retrieve()
                 .toBodilessEntity();
 
     }
 
     @Override
-    public void updateDeviceCount(String uuid, int countDevices) {
+    public void updateDeviceCount(RemnawaveUserRef user, int countDevices) {
+        RemnawaveUserRef selected = apiVersion.select(user);
         remnawaveRestClient.patch()
                 .uri("/api/users")
-                .body(new AddDeviceRequest(countDevices, uuid))
+                .body(new AddDeviceRequest(countDevices, selected.uuid(), selected.id()))
                 .retrieve()
                 .toBodilessEntity();
     }

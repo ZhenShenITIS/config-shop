@@ -22,7 +22,7 @@ public class RemnawaveEventListener {
     }
 
     private void updateSubscription(BotUser botUser, Subscription subscription, Instant newExpired) {
-        remnawaveClient.updateSubscription(botUser.getRemnawaveUuid(), newExpired, subscription.getDeviceCount());
+        remnawaveClient.updateSubscription(botUser.remnawaveRef(), newExpired, subscription.getDeviceCount());
     }
 
 }

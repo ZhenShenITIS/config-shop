@@ -8,6 +8,8 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import tg.configshop.dto.RemnawaveLimitedWebhookEvent;
 import tg.configshop.external_api.remnawave.RemnawaveClient;
+import tg.configshop.external_api.remnawave.RemnawaveUserRef;
+import tg.configshop.external_api.remnawave.config.RemnawaveApiVersion;
 import tg.configshop.external_api.remnawave.dto.squads.InternalSquad;
 import tg.configshop.external_api.remnawave.dto.user.RemnawaveUserResponse;
 import tg.configshop.external_api.remnawave.dto.user.UserTraffic;
@@ -17,6 +19,8 @@ import tg.configshop.services.ExternalTrafficService;
 
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 @Slf4j
@@ -27,6 +31,7 @@ public class ExternalTrafficServiceImpl implements ExternalTrafficService {
 
     private final BotUserRepository botUserRepository;
     private final RemnawaveClient remnawaveClient;
+    private final RemnawaveApiVersion apiVersion;
 
     @Value("${remnawave.squads.whitelist-uuid}")
     private String whitelistSquadUuid;
@@ -40,19 +45,19 @@ public class ExternalTrafficServiceImpl implements ExternalTrafficService {
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void handleLimitedWebhook(RemnawaveLimitedWebhookEvent event) {
-        String remnawaveUuid = event.remnawaveUuid();
-        BotUser botUser = getBotUserWithLock(remnawaveUuid);
+        BotUser botUser = getWebhookUserWithLock(event.user());
+        RemnawaveUserRef remoteUser = botUser.remnawaveRef();
 
         Long trafficLimitBytes = event.trafficLimitBytes();
         if (trafficLimitBytes == null || trafficLimitBytes == 0) {
-            log.info("Skip Remnawave limited webhook for user {}: traffic limit is {}", remnawaveUuid, trafficLimitBytes);
+            log.info("Skip Remnawave limited webhook for user {}: traffic limit is {}", remoteUser, trafficLimitBytes);
             return;
         }
 
         long usedTrafficBytes = event.usedTrafficBytes() == null ? 0L : event.usedTrafficBytes();
         if (usedTrafficBytes < trafficLimitBytes) {
             log.info("Skip Remnawave limited webhook for user {}: used traffic {} is below limit {}",
-                    remnawaveUuid, usedTrafficBytes, trafficLimitBytes);
+                    remoteUser, usedTrafficBytes, trafficLimitBytes);
             return;
         }
 
@@ -63,16 +68,17 @@ public class ExternalTrafficServiceImpl implements ExternalTrafficService {
         );
         long newTrafficLimitBytes = usedTrafficBytes + limitGraceBytes;
 
-        remnawaveClient.updateTrafficLimitAndInternalSquads(remnawaveUuid, newTrafficLimitBytes, activeInternalSquads);
+        remnawaveClient.updateTrafficLimitAndInternalSquads(remoteUser, newTrafficLimitBytes, activeInternalSquads);
         log.info("Handled Remnawave limited webhook for local user {} / remote user {}: limit {} -> {}, squads {}",
-                botUser.getId(), remnawaveUuid, trafficLimitBytes, newTrafficLimitBytes, activeInternalSquads);
+                botUser.getId(), remoteUser, trafficLimitBytes, newTrafficLimitBytes, activeInternalSquads);
     }
 
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void applyTrafficPurchase(String remnawaveUuid, int trafficGb) {
-        BotUser botUser = getBotUserWithLock(remnawaveUuid);
-        RemnawaveUserResponse remnawaveUser = remnawaveClient.getUser(remnawaveUuid);
+    public void applyTrafficPurchase(RemnawaveUserRef user, int trafficGb) {
+        BotUser botUser = getBotUserWithLock(user);
+        RemnawaveUserRef remoteUser = botUser.remnawaveRef();
+        RemnawaveUserResponse remnawaveUser = remnawaveClient.getUser(remoteUser);
 
         long currentLimit = remnawaveUser.trafficLimitBytes() == null ? 0L : remnawaveUser.trafficLimitBytes();
         long usedTrafficBytes = getUsedTrafficBytes(remnawaveUser);
@@ -82,7 +88,7 @@ public class ExternalTrafficServiceImpl implements ExternalTrafficService {
 
         if (newTrafficLimitBytes <= 0) {
             log.error("Calculated invalid Remnawave traffic limit for local user {} / remote user {}: currentLimit={}, used={}, trafficGb={}, newLimit={}",
-                    botUser.getId(), remnawaveUuid, currentLimit, usedTrafficBytes, trafficGb, newTrafficLimitBytes);
+                    botUser.getId(), remoteUser, currentLimit, usedTrafficBytes, trafficGb, newTrafficLimitBytes);
             throw new IllegalStateException("Calculated Remnawave traffic limit must be positive");
         }
 
@@ -92,16 +98,44 @@ public class ExternalTrafficServiceImpl implements ExternalTrafficService {
                 whitelistSquadUuid
         );
 
-        remnawaveClient.resetUserTraffic(remnawaveUuid);
-        remnawaveClient.updateTrafficLimitAndInternalSquads(remnawaveUuid, newTrafficLimitBytes, activeInternalSquads);
+        remnawaveClient.resetUserTraffic(remoteUser);
+        remnawaveClient.updateTrafficLimitAndInternalSquads(remoteUser, newTrafficLimitBytes, activeInternalSquads);
 
         log.info("Applied Remnawave traffic purchase for local user {} / remote user {}: currentLimit={}, used={}, purchasedGb={}, newLimit={}, squads={}",
-                botUser.getId(), remnawaveUuid, currentLimit, usedTrafficBytes, trafficGb, newTrafficLimitBytes, activeInternalSquads);
+                botUser.getId(), remoteUser, currentLimit, usedTrafficBytes, trafficGb, newTrafficLimitBytes, activeInternalSquads);
     }
 
-    private BotUser getBotUserWithLock(String remnawaveUuid) {
-        return botUserRepository.findByRemnawaveUuidWithLock(remnawaveUuid)
-                .orElseThrow(() -> new RuntimeException("User not found by Remnawave UUID: " + remnawaveUuid));
+    private BotUser getBotUserWithLock(RemnawaveUserRef user) {
+        RemnawaveUserRef selected = apiVersion.select(user);
+        BotUser botUser = (apiVersion.isV2()
+                ? botUserRepository.findByRemnawaveUuidWithLock(selected.uuid())
+                : botUserRepository.findByRemnawaveIdWithLock(selected.id()))
+                .orElseThrow(() -> new IllegalStateException("User not found by Remnawave reference: " + user));
+        validateUserReference(user, botUser);
+        return botUser;
+    }
+
+    private BotUser getWebhookUserWithLock(RemnawaveUserRef user) {
+        Optional<BotUser> found = user.id() == null
+                ? Optional.empty()
+                : botUserRepository.findByRemnawaveIdWithLock(user.id());
+        if (found.isEmpty() && user.uuid() != null && !user.uuid().isBlank()) {
+            found = botUserRepository.findByRemnawaveUuidWithLock(user.uuid());
+        }
+        BotUser botUser = found.orElseThrow(
+                () -> new IllegalStateException("Webhook user not found: " + user));
+        validateUserReference(user, botUser);
+        return botUser;
+    }
+
+    private void validateUserReference(RemnawaveUserRef user, BotUser botUser) {
+        boolean conflictingId = user.id() != null && botUser.getRemnawaveId() != null
+                && !Objects.equals(user.id(), botUser.getRemnawaveId());
+        boolean conflictingUuid = user.uuid() != null && !user.uuid().isBlank()
+                && !Objects.equals(user.uuid(), botUser.getRemnawaveUuid());
+        if (conflictingId || conflictingUuid) {
+            throw new IllegalStateException("Conflicting Remnawave identifiers for local user " + botUser.getId());
+        }
     }
 
     private long getUsedTrafficBytes(RemnawaveUserResponse remnawaveUser) {
