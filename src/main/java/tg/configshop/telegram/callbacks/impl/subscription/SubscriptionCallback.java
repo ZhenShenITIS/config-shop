@@ -48,11 +48,12 @@ public class SubscriptionCallback implements Callback {
 
     @Override
     public void processCallback(CallbackQuery callbackQuery, TelegramClient telegramClient) {
+        boolean json = !(callbackName.getCallbackName() + ":non-json").equals(callbackQuery.getData());
         Long userId = callbackQuery.getFrom().getId();
         BotUser botUser = userService.getUser(userId);
 
         List<Device> devices = deviceService.getDevicesByUserId(userId);
-        RemnawaveUser remoteUser = externalSubscriptionService.getExternalUserWithCryptLinkAndSync(userId);
+        RemnawaveUser remoteUser = externalSubscriptionService.getExternalUserWithCryptLinkAndSync(userId, json);
         int maxDevices = remoteUser.hwidDeviceLimit();
 
         double usedTrafficGb = remoteUser.userTraffic().usedTraffic();
@@ -99,6 +100,12 @@ public class SubscriptionCallback implements Callback {
                         InlineKeyboardButton.builder()
                                 .text(ButtonText.DEVICES.getText())
                                 .callbackData(CallbackName.DEVICES.getCallbackName())
+                                .build()
+                ))
+                .keyboardRow(new InlineKeyboardRow(
+                        InlineKeyboardButton.builder()
+                                .text((json ? ButtonText.GET_NON_JSON_KEY : ButtonText.GET_JSON_KEY).getText())
+                                .callbackData(callbackName.getCallbackName() + (json ? ":non-json" : ":json"))
                                 .build()
                 ))
                 .keyboardRow(new InlineKeyboardRow(

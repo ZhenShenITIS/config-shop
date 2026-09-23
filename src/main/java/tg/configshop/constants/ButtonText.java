@@ -23,6 +23,8 @@ public enum ButtonText {
     BUY_SUBSCRIPTION("📄 Продлить / купить подписку"),
     BUY_TRAFFIC("📊 Докупить трафик"),
     DEVICES("📱 Устройства"),
+    GET_NON_JSON_KEY("🔑 Получить non-JSON ключ"),
+    GET_JSON_KEY("🔑 Получить JSON ключ"),
     SUB_PERIOD_1_MONTH("📅 1 месяц — %d ₽"),
     SUB_PERIOD_3_MONTH("📅 3 месяца — %d ₽"),
     SUB_PERIOD_6_MONTH("📅 6 месяцев — %d ₽"),

@@ -17,13 +17,17 @@ public class ExternalSubscriptionService {
     private final RemnawaveClient remnawaveClient;
     private final UserService userService;
 
-    public RemnawaveUser getExternalUserWithCryptLinkAndSync (long userId) {
+    public RemnawaveUser getExternalUserWithCryptLinkAndSync (long userId, boolean json) {
         BotUser botUser = userService.getUser(userId);
         RemnawaveUserResponse response = remnawaveClient.getUser(botUser.remnawaveRef());
         userService.syncRemnawaveUserWithLocalUser(response, botUser);
         String subLink = null;
         try {
-            subLink = RsaEncryptor.encryptAndBuildLink(response.subscriptionUrl());
+            String subscriptionUrl = response.subscriptionUrl();
+            if (json) {
+                subscriptionUrl += "/json";
+            }
+            subLink = RsaEncryptor.encryptAndBuildLink(subscriptionUrl);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
