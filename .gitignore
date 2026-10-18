@@ -36,3 +36,7 @@ build/
 all.txt
 .env
 CLAUDE.md
+
+# Database backups contain production data
+*.dump
+*.dump.partial
