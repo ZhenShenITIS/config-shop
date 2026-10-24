@@ -2,8 +2,6 @@ package tg.configshop.listeners;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.event.EventListener;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -15,7 +13,6 @@ import org.telegram.telegrambots.meta.generics.TelegramClient;
 import tg.configshop.constants.ButtonText;
 import tg.configshop.constants.CallbackName;
 import tg.configshop.constants.MessageText;
-import tg.configshop.constants.WithdrawalStatus;
 import tg.configshop.events.WithdrawalCreatedEvent;
 import tg.configshop.model.BotUser;
 import tg.configshop.model.Withdrawal;
@@ -38,12 +35,12 @@ public class WithdrawalCreatedListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleWithdrawalCreated(WithdrawalCreatedEvent event) {
         try {
-            Withdrawal withdrawal = withdrawalService.getWithdrawal(event.getWithdrawalId());
-            BotUser user = withdrawal.getBotUser();
+            Withdrawal withdrawal = withdrawalService.getWithdrawal(event.getWithdrawalId().toString());
+            BotUser user = withdrawalService.getRecipient(withdrawal);
             List<Long> adminIds = administratorRepository.getAdminIdList();
 
             String text = formatAdminMessage(withdrawal, user);
-            InlineKeyboardMarkup markup = createAdminKeyboard(withdrawal.getId());
+            InlineKeyboardMarkup markup = createAdminKeyboard(withdrawal.getId().toString());
 
             for (Long adminId : adminIds) {
                 SendMessage msg = SendMessage.builder()
@@ -85,7 +82,7 @@ public class WithdrawalCreatedListener {
         );
     }
 
-    public static InlineKeyboardMarkup createAdminKeyboard(Long withdrawalId) {
+    public static InlineKeyboardMarkup createAdminKeyboard(String withdrawalId) {
         String payload = ":" + withdrawalId;
         List<InlineKeyboardRow> rows = new ArrayList<>();
 

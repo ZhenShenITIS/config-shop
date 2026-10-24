@@ -8,9 +8,8 @@ import java.util.List;
 public interface UserService {
     BotUser getUser (Long userId);
     List<BotUser> getUser (String username);
-    void addToBalance(Long userId, Long amountToAdd);
     void addToBalanceAsAdminTopUp(Long userId, Long amountToAdd);
     void syncRemnawaveUserWithLocalUser (RemnawaveUserResponse userResponse, BotUser botUser);
     List<BotUser> getAllUsers();
-    void decreaseBalance(Long userId, Long amountToDecrease);
+    long getBalance(Long userId);
 }

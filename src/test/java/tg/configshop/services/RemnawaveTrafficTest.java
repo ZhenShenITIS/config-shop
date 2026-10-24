@@ -9,8 +9,8 @@ import tg.configshop.external_api.remnawave.config.RemnawaveApiVersion;
 import tg.configshop.external_api.remnawave.dto.squads.InternalSquad;
 import tg.configshop.external_api.remnawave.dto.user.RemnawaveUserResponse;
 import tg.configshop.external_api.remnawave.dto.user.UserTraffic;
-import tg.configshop.model.BotUser;
-import tg.configshop.repositories.BotUserRepository;
+import tg.configshop.model.RemnawaveSubscription;
+import tg.configshop.repositories.RemnawaveSubscriptionRepository;
 import tg.configshop.services.impl.ExternalTrafficServiceImpl;
 
 import java.util.List;
@@ -20,9 +20,9 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class RemnawaveTrafficTest {
-    private final BotUserRepository repository = mock(BotUserRepository.class);
+    private final RemnawaveSubscriptionRepository repository = mock(RemnawaveSubscriptionRepository.class);
     private final RemnawaveClient client = mock(RemnawaveClient.class);
-    private final BotUser user = BotUser.builder().id(736L).remnawaveUuid("uuid").remnawaveId(123L).build();
+    private final RemnawaveSubscription user = RemnawaveSubscription.builder().id(new java.util.UUID(0,736)).remnawaveUuid("uuid").remnawaveId(123L).build();
 
     @Test
     void handlesV3WebhookById() {

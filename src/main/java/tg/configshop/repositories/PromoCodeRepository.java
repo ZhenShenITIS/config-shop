@@ -4,14 +4,15 @@ import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
-import tg.configshop.model.BotUser;
+import tg.configshop.model.Account;
+import java.util.UUID;
 import tg.configshop.model.PromoCode;
 
 import java.util.List;
 import java.util.Optional;
 
-public interface PromoCodeRepository extends JpaRepository<PromoCode, Long> {
-    List<PromoCode> findAllByReferrer(BotUser referrer);
+public interface PromoCodeRepository extends JpaRepository<PromoCode, UUID> {
+    List<PromoCode> findAllByReferrer(Account referrer);
 
     Optional<PromoCode> findByCode(String code);
 
@@ -20,5 +21,5 @@ public interface PromoCodeRepository extends JpaRepository<PromoCode, Long> {
     Optional<PromoCode> findByCodeWithLock(String code);
 
     @Query("SELECT p.code FROM PromoCode p WHERE p.referrer = :referrer")
-    List<String> findCodesByReferrer(BotUser referrer);
+    List<String> findCodesByReferrer(Account referrer);
 }

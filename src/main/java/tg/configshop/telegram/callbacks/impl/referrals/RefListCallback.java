@@ -68,9 +68,7 @@ public class RefListCallback implements Callback {
             for (ReferralWithProfitAndLevel item : page.getContent()) {
                 BotUser ref = item.botUser();
 
-                String template = DateUtil.isExpired(ref)
-                        ? MessageText.REFERRAL_INFO_INACTIVE.getMessageText()
-                        : MessageText.REFERRAL_INFO_ACTIVE.getMessageText();
+                String template = MessageText.REFERRAL_INFO.getMessageText();
 
                 String dateStr = DateUtil.getPrettyDate(item.referredAt());
 

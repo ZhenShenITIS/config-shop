@@ -1,5 +1,7 @@
 package tg.configshop.telegram.message_body;
 
+import tg.configshop.services.ExternalSubscriptionService;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -22,6 +24,7 @@ import tg.configshop.util.StringUtil;
 public class StartCommandBody {
     private final RegistrationService registrationService;
     private final UserService userService;
+    private final ExternalSubscriptionService externalSubscriptionService;
 
     @Value("${CONFIG_PANEL_SUB_URL}")
     private String subUrl;
@@ -48,10 +51,11 @@ public class StartCommandBody {
 
         String firstName = StringUtil.getSafeHtmlString(user.getFirstName());
 
-        String text = DateUtil.isExpired(botUser) ?
+        java.time.Instant expiry = externalSubscriptionService.getExternalUser(userId).expireAt();
+        String text = DateUtil.isExpired(expiry) ?
                 MessageText.START_TEXT_EXPIRED.getMessageText().formatted(firstName)
                 :
-                MessageText.START_TEXT_ACTIVE.getMessageText().formatted(firstName, DateUtil.getDateEndSubscription(botUser));
+                MessageText.START_TEXT_ACTIVE.getMessageText().formatted(firstName, DateUtil.getDateEndSubscription(expiry));
 
         InlineKeyboardMarkup keyboard = InlineKeyboardMarkup
                 .builder()
@@ -65,7 +69,7 @@ public class StartCommandBody {
                 .keyboardRow(new InlineKeyboardRow(
                         InlineKeyboardButton
                                 .builder()
-                                .text(ButtonText.BALANCE.getText().formatted(botUser.getBalance()))
+                                .text(ButtonText.BALANCE.getText().formatted(userService.getBalance(botUser.getId())))
                                 .callbackData(CallbackName.BALANCE.getCallbackName())
                                 .build()
                 ))

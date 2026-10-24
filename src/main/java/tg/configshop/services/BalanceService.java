@@ -1,6 +1,10 @@
 package tg.configshop.services;
 
-import tg.configshop.model.TopUp;
-
+import tg.configshop.model.*;
+import java.util.UUID;
 public interface BalanceService {
+    long balance(UUID accountId);
+    void credit(TopUp topUp);
+    void purchase(Purchase purchase);
+    void withdrawal(Withdrawal withdrawal, boolean refund);
 }

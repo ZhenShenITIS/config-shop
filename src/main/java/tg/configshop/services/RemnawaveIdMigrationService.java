@@ -7,8 +7,8 @@ import org.springframework.web.client.RestClientResponseException;
 import tg.configshop.external_api.remnawave.RemnawaveClient;
 import tg.configshop.external_api.remnawave.config.RemnawaveApiVersion;
 import tg.configshop.external_api.remnawave.dto.user.RemnawaveUserResponse;
-import tg.configshop.model.BotUser;
-import tg.configshop.repositories.BotUserRepository;
+import tg.configshop.model.RemnawaveSubscription;
+import tg.configshop.repositories.RemnawaveSubscriptionRepository;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -18,7 +18,7 @@ import java.util.Objects;
 @Service
 @RequiredArgsConstructor
 public class RemnawaveIdMigrationService {
-    private final BotUserRepository botUserRepository;
+    private final RemnawaveSubscriptionRepository subscriptionRepository;
     private final RemnawaveClient remnawaveClient;
     private final RemnawaveApiVersion apiVersion;
 
@@ -26,11 +26,11 @@ public class RemnawaveIdMigrationService {
         if (!apiVersion.isV2()) {
             throw new IllegalStateException("Заполнение ID доступно только в режиме API v2.");
         }
-        List<BotUser> users = botUserRepository.findAllByRemnawaveIdIsNullOrderByIdAsc();
+        List<RemnawaveSubscription> users = subscriptionRepository.findAllByRemnawaveIdIsNullOrderByIdAsc();
         List<String> errors = new ArrayList<>();
         int processed = 0;
         int updated = 0;
-        for (BotUser user : users) {
+        for (RemnawaveSubscription user : users) {
             processed++;
             try {
                 apiVersion.select(user.remnawaveRef());
@@ -40,7 +40,7 @@ public class RemnawaveIdMigrationService {
                     errors.add(user.getId() + ": некорректный ID или несовпадение UUID в ответе панели");
                     continue;
                 }
-                if (botUserRepository.updateRemnawaveId(user.getId(), response.id()) != 1) {
+                if (subscriptionRepository.updateRemnawaveId(user.getId(), response.id()) != 1) {
                     errors.add(user.getId() + ": локальный пользователь не найден при сохранении");
                     continue;
                 }
@@ -57,7 +57,7 @@ public class RemnawaveIdMigrationService {
                 }
             }
         }
-        return new Result(processed, updated, botUserRepository.countByRemnawaveIdIsNull(), List.copyOf(errors));
+        return new Result(processed, updated, subscriptionRepository.countByRemnawaveIdIsNull(), List.copyOf(errors));
     }
 
     public record Result(int processed, int updated, long remaining, List<String> errors) {

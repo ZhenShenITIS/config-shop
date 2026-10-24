@@ -34,7 +34,7 @@ public class BalanceCallback implements Callback {
         long userId = callbackQuery.getFrom().getId();
 
         BotUser botUser = userService.getUser(userId);
-        String balance = botUser.getBalance().toString();
+        String balance = Long.toString(userService.getBalance(botUser.getId()));
 
         EditMessageText editMessage = EditMessageText.builder()
                 .chatId(chatId)

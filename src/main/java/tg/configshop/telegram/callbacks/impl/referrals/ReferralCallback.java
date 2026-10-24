@@ -41,7 +41,6 @@ public class ReferralCallback implements Callback {
         int messageId = callbackQuery.getMessage().getMessageId();
 
         int allCount = referralService.getAllReferralCount(userId);
-        int activeCount = referralService.getActiveReferralCount(userId);
         long profit = referralService.getAllProfit(userId);
         long available = referralService.getAvailableSumToWithdraw(userId);
         List<String> promoCode = referralService.getReferralPromoCodes(userId);
@@ -61,7 +60,6 @@ public class ReferralCallback implements Callback {
 
         String text = messageTemplate.formatted(
                 allCount,
-                activeCount,
                 profit,
                 available,
                 getPromoAsString(promoCode),

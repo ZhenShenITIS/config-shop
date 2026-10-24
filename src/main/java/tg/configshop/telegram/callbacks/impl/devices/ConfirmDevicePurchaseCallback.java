@@ -64,14 +64,14 @@ public class ConfirmDevicePurchaseCallback implements Callback {
         long totalPrice = (long) deviceCount * pricePerDevice;
 
         try {
-            devicePurchaseService.purchaseDevices(userId, deviceCount, totalPrice);
+            totalPrice = devicePurchaseService.purchaseDevices(userId, deviceCount);
             sendSuccessMessage(telegramClient, chatId, messageId, deviceCount, (int) totalPrice);
 
         } catch (InsufficientBalanceException e) {
 
             BotUser user = userService.getUser(userId);
             sendInsufficientBalanceMessage(telegramClient, chatId, messageId,
-                    deviceCount, (int) totalPrice, user.getBalance().intValue());
+                    deviceCount, (int) totalPrice, (int) userService.getBalance(user.getId()));
         } catch (TooManyDevicesException e) {
             sendTooManyDevicesMessage(telegramClient, chatId, messageId);
         } catch (Exception e) {

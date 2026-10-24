@@ -1,5 +1,7 @@
 package tg.configshop.services;
 
+import tg.configshop.model.RemnawaveSubscription;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import tg.configshop.dto.RemnawaveUser;
@@ -35,13 +37,13 @@ public class ExternalSubscriptionService {
                 .builder()
                 .expireAt(response.expireAt())
                 .subscriptionUrl(subLink)
-                .daysLeft(DateUtil.getDaysLeft(botUser))
+                .daysLeft(DateUtil.getDaysLeft(response.expireAt()))
                 .hwidDeviceLimit(response.hwidDeviceLimit())
                 .userTraffic(new UserTrafficInGigabytes(response.userTraffic()))
                 .uuid(response.uuid())
                 .id(response.id())
-                .prettyDateExpireAt(DateUtil.getDateEndSubscription(botUser))
-                .isActive(!DateUtil.isExpired(botUser))
+                .prettyDateExpireAt(DateUtil.getDateEndSubscription(response.expireAt()))
+                .isActive(!DateUtil.isExpired(response.expireAt()))
                 .shortUuid(response.shortUuid())
                 .telegramId(response.telegramId())
                 .username(response.username())
@@ -51,17 +53,21 @@ public class ExternalSubscriptionService {
 
     public RemnawaveUser getExternalUser (long userId) {
         BotUser botUser = userService.getUser(userId);
-        RemnawaveUserResponse response = remnawaveClient.getUser(botUser.remnawaveRef());
+        return getExternalUser(botUser.getSubscription());
+    }
+
+    public RemnawaveUser getExternalUser(RemnawaveSubscription subscription) {
+        RemnawaveUserResponse response = remnawaveClient.getUser(subscription.remnawaveRef());
         return RemnawaveUser
                 .builder()
                 .expireAt(response.expireAt())
-                .daysLeft(DateUtil.getDaysLeft(botUser))
+                .daysLeft(DateUtil.getDaysLeft(response.expireAt()))
                 .hwidDeviceLimit(response.hwidDeviceLimit())
                 .userTraffic(new UserTrafficInGigabytes(response.userTraffic()))
                 .uuid(response.uuid())
                 .id(response.id())
-                .prettyDateExpireAt(DateUtil.getDateEndSubscription(botUser))
-                .isActive(!DateUtil.isExpired(botUser))
+                .prettyDateExpireAt(DateUtil.getDateEndSubscription(response.expireAt()))
+                .isActive(!DateUtil.isExpired(response.expireAt()))
                 .shortUuid(response.shortUuid())
                 .telegramId(response.telegramId())
                 .username(response.username())

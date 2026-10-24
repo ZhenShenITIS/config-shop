@@ -1,49 +1,46 @@
 package tg.configshop.model;
 
-
-import io.hypersistence.tsid.TSID;
-import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.EnumType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import java.time.Instant;
+import java.util.UUID;
 import tg.configshop.constants.WithdrawalStatus;
 import tg.configshop.constants.WithdrawalType;
-
-import java.time.Instant;
 
 @Entity
 @Getter
 @Setter
 @Builder
-@AllArgsConstructor
 @NoArgsConstructor
+@AllArgsConstructor
 @Table(name = "withdrawals")
 public class Withdrawal {
     @Id
-    @Builder.Default
-    private Long id = TSID.fast().toLong();
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
     @ManyToOne
-    private BotUser botUser;
+    private Account account;
     @Builder.Default
     private Instant createdAt = Instant.now();
+    @Builder.Default
+    private Instant updatedAt = Instant.now();
     private Long amount;
     @Enumerated(EnumType.STRING)
     @Builder.Default
     private WithdrawalStatus status = WithdrawalStatus.IN_PROGRESS;
     @Enumerated(EnumType.STRING)
-    // CARD, CRYPTO
     private WithdrawalType type;
     private String requisites;
-
-    public String getPublicId() {
-        return TSID.from(id).toString();
-    }
+    public String getPublicId() { return id.toString(); }
 }

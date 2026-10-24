@@ -78,7 +78,7 @@ public class ConfirmBuyCallback implements Callback {
 
         String backCallbackData = getBackCallbackNameByDays(days) + PAYLOAD_SEPARATOR + devices;
 
-        String payCallbackData = CallbackName.PURCHASE.getCallbackName() + PAYLOAD_SEPARATOR + subscription.getId();
+        String payCallbackData = CallbackName.PURCHASE.getCallbackName() + PAYLOAD_SEPARATOR + days + PAYLOAD_SEPARATOR + devices;
 
         InlineKeyboardMarkup keyboard = InlineKeyboardMarkup.builder()
                 .keyboardRow(new InlineKeyboardRow(

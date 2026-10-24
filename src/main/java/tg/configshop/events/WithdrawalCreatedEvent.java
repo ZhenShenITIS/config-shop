@@ -5,9 +5,9 @@ import org.springframework.context.ApplicationEvent;
 
 @Getter
 public class WithdrawalCreatedEvent extends ApplicationEvent {
-    private final Long withdrawalId;
+    private final java.util.UUID withdrawalId;
 
-    public WithdrawalCreatedEvent(Object source, Long withdrawalId) {
+    public WithdrawalCreatedEvent(Object source, java.util.UUID withdrawalId) {
         super(source);
         this.withdrawalId = withdrawalId;
     }

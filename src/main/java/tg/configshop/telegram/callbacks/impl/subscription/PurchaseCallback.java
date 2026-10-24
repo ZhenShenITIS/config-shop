@@ -45,16 +45,21 @@ public class PurchaseCallback implements Callback {
             return;
         }
 
-        Long subscriptionId;
+        if (parts.length != 3) {
+            new BuySubMenuCallback(subscriptionService).processCallback(callbackQuery, telegramClient);
+            return;
+        }
+        int days;
+        int devices;
         try {
-            subscriptionId = Long.parseLong(parts[1]);
+            days = Integer.parseInt(parts[1]);
+            devices = Integer.parseInt(parts[2]);
         } catch (NumberFormatException e) {
             sendUnknownError(telegramClient, chatId, messageId);
             return;
         }
-
         try {
-            subscriptionService.buySubscription(userId, subscriptionId);
+            subscriptionService.buySubscription(userId, days, devices);
             sendSuccessMessage(telegramClient, chatId, messageId);
         } catch (InsufficientBalanceException e) {
             sendInsufficientBalanceMessage(telegramClient, chatId, messageId);

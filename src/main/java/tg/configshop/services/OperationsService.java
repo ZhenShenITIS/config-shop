@@ -12,12 +12,13 @@ import tg.configshop.repositories.PurchaseRepository;
 @RequiredArgsConstructor
 public class OperationsService {
     private final PurchaseRepository purchaseRepository;
+    private final UserService userService;
     private final int OPERATION_PAGE_SIZE = 10;
 
 
     public Page<OperationView> getOperationsByUserId (long userId, int pageNumber) {
         Pageable pageable = PageRequest.of(pageNumber, OPERATION_PAGE_SIZE);
 
-        return purchaseRepository.findOperationsByUserId(userId, pageable);
+        return purchaseRepository.findOperationsByUserId(userService.getUser(userId).getAccount().getId(), pageable);
     }
 }

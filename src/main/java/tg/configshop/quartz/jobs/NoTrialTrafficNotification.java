@@ -1,5 +1,8 @@
 package tg.configshop.quartz.jobs;
 
+import tg.configshop.repositories.RemnawaveSubscriptionRepository;
+import tg.configshop.model.RemnawaveSubscription;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.quartz.Job;
@@ -31,6 +34,7 @@ public class NoTrialTrafficNotification implements Job {
 
     private final BotUserRepository userRepository;
     private final ExternalSubscriptionService externalSubscriptionService;
+    private final RemnawaveSubscriptionRepository subscriptions;
     private final TelegramClient telegramClient;
 
     @Value("${SUPPORT_USERNAME}")
@@ -64,13 +68,14 @@ public class NoTrialTrafficNotification implements Job {
             return;
         }
 
-        if (DateUtil.isExpired(user)) {
-            log.info("User {} subscription expired, skipping check", userId);
-            return;
-        }
-
         try {
-            RemnawaveUser remnawaveUser = externalSubscriptionService.getExternalUser(userId);
+            RemnawaveSubscription subscription = dataMap.containsKey("subscriptionId")
+                    ? subscriptions.findById(java.util.UUID.fromString(dataMap.getString("subscriptionId"))).orElseThrow()
+                    : user.getSubscription();
+            if (!subscription.getAccount().getId().equals(user.getAccount().getId()))
+                throw new IllegalStateException("Subscription owner mismatch");
+            RemnawaveUser remnawaveUser = externalSubscriptionService.getExternalUser(subscription);
+            if (DateUtil.isExpired(remnawaveUser.expireAt())) return;
             UserTrafficInGigabytes userTraffic = remnawaveUser.userTraffic();
 
             if (userTraffic.usedTraffic() == 0) {

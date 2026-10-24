@@ -5,75 +5,43 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import tg.configshop.constants.TopUpSource;
 import tg.configshop.dto.ReferralView;
-import tg.configshop.dto.ReferralWithProfit;
-import tg.configshop.model.BotUser;
+import java.util.UUID;
 import tg.configshop.model.Referral;
 
-import java.time.Instant;
-import java.util.List;
 import java.util.Optional;
 
-public interface ReferralRepository extends JpaRepository<Referral, Long> {
-    int countReferralsByReferrer_Id(Long referrerId);
+public interface ReferralRepository extends JpaRepository<Referral, UUID> {
+    int countReferralsByReferrer_Id(UUID referrerId);
 
-    @Query("""
-    SELECT COUNT(r) 
-    FROM Referral r 
-    WHERE r.referrer.id = :referrerId 
-      AND r.referral.expireAt > :now
-""")
-    int countActiveReferrals(@Param("referrerId") Long referrerId, @Param("now") Instant now);
-
-    Optional<Referral> findByReferral_Id(Long referralId);
+    Optional<Referral> findByReferral_Id(UUID referralId);
 
     @Query(value = """
         WITH RECURSIVE ancestors AS (
             SELECT referrer_id
             FROM referrals
             WHERE referral_id = :potentialReferrerId
-            
-            UNION ALL
-            
+
+            UNION
+
             SELECT r.referrer_id
             FROM referrals r
             INNER JOIN ancestors a ON r.referral_id = a.referrer_id
         )
-        SELECT COUNT(*) > 0 
-        FROM ancestors 
+        SELECT COUNT(*) > 0
+        FROM ancestors
         WHERE referrer_id = :currentUserId
         """, nativeQuery = true)
-    boolean isUserAncestorOf(@Param("currentUserId") Long currentUserId,
-                             @Param("potentialReferrerId") Long potentialReferrerId);
+    boolean isUserAncestorOf(@Param("currentUserId") UUID currentUserId,
+                             @Param("potentialReferrerId") UUID potentialReferrerId);
 
 
 
-
-    @Query("""
-                SELECT new tg.configshop.dto.ReferralWithProfit(
-                    r.referral, 
-                    CAST (COALESCE(SUM(tu.value), 0) AS LONG),
-                    r.createdAt
-                  
-                )
-                FROM Referral r
-                LEFT JOIN TopUp tu 
-                    ON tu.referral = r.referral 
-                    AND tu.topUpSource = 'REFERRAL'
-                WHERE r.referrer.id = :referrerId
-                GROUP BY r.referral, r.createdAt
-                ORDER BY r.createdAt DESC 
-            """)
-    Page<ReferralWithProfit> getReferralsWithProfit(
-            @Param("referrerId") Long referrerId,
-            Pageable pageable
-    );
 
     @Query(value = """
         WITH RECURSIVE referral_tree AS (
-        
-            SELECT 
+
+            SELECT
                 r.referral_id        AS referral_id,
                 r.created_at         AS referred_at,
                 1                    AS lvl
@@ -82,8 +50,8 @@ public interface ReferralRepository extends JpaRepository<Referral, Long> {
 
             UNION ALL
 
-        
-            SELECT 
+
+            SELECT
                 r.referral_id        AS referral_id,
                 r.created_at         AS referred_at,
                 rt.lvl + 1           AS lvl
@@ -91,35 +59,34 @@ public interface ReferralRepository extends JpaRepository<Referral, Long> {
             JOIN referral_tree rt ON r.referrer_id = rt.referral_id
             WHERE rt.lvl < 3
         )
-        SELECT 
-            b.id                          AS userId,
-            b.first_name                  AS firstName,
-            b.expire_at                   AS expireAt,
+        SELECT
+            b.telegram_id                 AS userId,
+            b.name                  AS firstName,
             rt.referred_at                AS referredAt,
             rt.lvl                        AS lvl,
             COALESCE(SUM(t.value), 0)     AS profit
         FROM referral_tree rt
-        JOIN bot_users b ON rt.referral_id = b.id
-        LEFT JOIN top_ups t 
-            ON t.referral_id = rt.referral_id AND t.top_up_source = 'REFERRAL' AND t.bot_user_id = :referrerId
-        GROUP BY b.id, b.first_name, b.expire_at, rt.referred_at, rt.lvl
+        JOIN bot_users b ON rt.referral_id = b.account_id
+        LEFT JOIN top_ups t
+            ON t.referral_id = rt.referral_id AND t.top_up_source = 'REFERRAL' AND t.account_id = :referrerId
+        GROUP BY b.telegram_id, b.name, rt.referred_at, rt.lvl
         ORDER BY rt.lvl, rt.referred_at DESC
         """,
             countQuery = """
         WITH RECURSIVE referral_tree AS (
-            
-            SELECT 
-                r.referral_id, 
-                1 AS lvl 
+
+            SELECT
+                r.referral_id,
+                1 AS lvl
             FROM referrals r
             WHERE r.referrer_id = :referrerId
 
             UNION ALL
 
-        
-            SELECT 
-                r.referral_id, 
-                rt.lvl + 1 
+
+            SELECT
+                r.referral_id,
+                rt.lvl + 1
             FROM referrals r
             JOIN referral_tree rt ON r.referrer_id = rt.referral_id
             WHERE rt.lvl < 3
@@ -128,7 +95,7 @@ public interface ReferralRepository extends JpaRepository<Referral, Long> {
         """,
             nativeQuery = true)
     Page<ReferralView> findReferralsProjection(
-            @Param("referrerId") Long referrerId,
+            @Param("referrerId") UUID referrerId,
             Pageable pageable
     );
 }

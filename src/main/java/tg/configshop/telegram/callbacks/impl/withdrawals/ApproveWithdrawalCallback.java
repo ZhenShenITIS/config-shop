@@ -30,13 +30,13 @@ public class ApproveWithdrawalCallback implements Callback {
     @AdminOnly
     public void processCallback(CallbackQuery callbackQuery, TelegramClient telegramClient) {
         String[] parts = callbackQuery.getData().split(":");
-        Long withdrawalId = Long.parseLong(parts[1]);
+        String withdrawalId = parts[1];
 
         try {
             withdrawalService.approveWithdrawal(withdrawalId);
 
             Withdrawal wd = withdrawalService.getWithdrawal(withdrawalId);
-            String text = WithdrawalCreatedListener.formatAdminMessage(wd, wd.getBotUser());
+            String text = WithdrawalCreatedListener.formatAdminMessage(wd, withdrawalService.getRecipient(wd));
 
             telegramClient.execute(EditMessageText.builder()
                     .chatId(callbackQuery.getMessage().getChatId())
@@ -50,7 +50,7 @@ public class ApproveWithdrawalCallback implements Callback {
                     wd.getPublicId(), wd.getAmount());
 
             telegramClient.execute(SendMessage.builder()
-                    .chatId(wd.getBotUser().getId())
+                    .chatId(withdrawalService.getRecipient(wd).getId())
                     .text(userMsg)
                     .parseMode("HTML")
                     .build());

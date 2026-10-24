@@ -1,5 +1,7 @@
 package tg.configshop.telegram.callbacks.impl.balance;
 
+import tg.configshop.constants.BalanceLogType;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Component;
@@ -31,7 +33,7 @@ public class HistoryCallback implements Callback {
     private final UserService userService;
 
     private static final String PAYLOAD_SEPARATOR = ":";
-    
+
     @Override
     public CallbackName getCallback() {
         return CallbackName.HISTORY;
@@ -53,7 +55,7 @@ public class HistoryCallback implements Callback {
         }
 
         Page<OperationView> page = operationsService.getOperationsByUserId(userId, pageNumber);
-        
+
         String text;
         List<InlineKeyboardRow> rows = new ArrayList<>();
 
@@ -61,7 +63,7 @@ public class HistoryCallback implements Callback {
             text = MessageText.HISTORY_EMPTY.getMessageText();
         } else {
             String operationList = getPrettyOperationList(page);
-            text = MessageText.HISTORY_HEADER.getMessageText().formatted(user.getBalance(), operationList);
+            text = MessageText.HISTORY_HEADER.getMessageText().formatted(userService.getBalance(user.getId()), operationList);
         }
 
 
@@ -125,12 +127,19 @@ public class HistoryCallback implements Callback {
     private String getPrettyOperationList(Page<OperationView> page) {
         StringBuilder stringBuilder = new StringBuilder();
         for (OperationView v : page) {;
-            String template = switch (v.getOperationType()) {
-                case TOP_UP -> MessageText.HISTORY_TOP_UP.getMessageText();
-                case PURCHASE -> MessageText.HISTORY_PURCHASE.getMessageText();
-                case WITHDRAW -> MessageText.HISTORY_WITHDRAW.getMessageText();
+            String label = switch (v.getLedgerType()) {
+                case WITHDRAWAL_REJECT -> "Возврат отклонённого вывода";
+                case ADMIN -> "Корректировка баланса";
+                default -> switch (v.getOperationType()) {
+                    case TOP_UP -> "Пополнение";
+                    case PURCHASE -> "Покупка";
+                    case WITHDRAW -> "Вывод средств";
+                };
             };
-            stringBuilder.append(template.formatted(v.getAmount(), DateUtil.getPrettyDateWithTime(v.getDate()), getDescriptionView(v)));
+            String description = v.getLedgerType() == BalanceLogType.WITHDRAWAL_REJECT
+                    ? "Средства возвращены на баланс" : getDescriptionView(v);
+            stringBuilder.append(MessageText.HISTORY_OPERATION.getMessageText().formatted(
+                    label, v.getAmount(), DateUtil.getPrettyDateWithTime(v.getDate()), description));
             stringBuilder.append("\n");
         }
         return stringBuilder.toString();

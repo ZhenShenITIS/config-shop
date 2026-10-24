@@ -29,11 +29,11 @@ public class RefreshWithdrawalCallback implements Callback {
     @AdminOnly
     public void processCallback(CallbackQuery callbackQuery, TelegramClient telegramClient) {
         String[] parts = callbackQuery.getData().split(":");
-        Long withdrawalId = Long.parseLong(parts[1]);
+        String withdrawalId = parts[1];
 
         try {
             Withdrawal wd = withdrawalService.getWithdrawal(withdrawalId);
-            String text = WithdrawalCreatedListener.formatAdminMessage(wd, wd.getBotUser());
+            String text = WithdrawalCreatedListener.formatAdminMessage(wd, withdrawalService.getRecipient(wd));
 
             try {
                 telegramClient.execute(EditMessageText.builder()

@@ -6,8 +6,8 @@ import org.springframework.web.client.HttpClientErrorException;
 import tg.configshop.external_api.remnawave.RemnawaveClient;
 import tg.configshop.external_api.remnawave.config.RemnawaveApiVersion;
 import tg.configshop.external_api.remnawave.dto.user.RemnawaveUserResponse;
-import tg.configshop.model.BotUser;
-import tg.configshop.repositories.BotUserRepository;
+import tg.configshop.model.RemnawaveSubscription;
+import tg.configshop.repositories.RemnawaveSubscriptionRepository;
 
 import java.util.List;
 
@@ -15,17 +15,17 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class RemnawaveIdMigrationServiceTest {
-    private final BotUserRepository repository = mock(BotUserRepository.class);
+    private final RemnawaveSubscriptionRepository repository = mock(RemnawaveSubscriptionRepository.class);
     private final RemnawaveClient client = mock(RemnawaveClient.class);
     private final RemnawaveIdMigrationService service =
             new RemnawaveIdMigrationService(repository, client, new RemnawaveApiVersion(2));
 
     @Test
     void fillsIdsAndRepeatedRunDoesNotTouchCompletedUsers() {
-        BotUser user = user(736L);
+        RemnawaveSubscription user = user(736L);
         when(repository.findAllByRemnawaveIdIsNullOrderByIdAsc()).thenReturn(List.of(user), List.of());
         when(client.getUser(user.remnawaveRef())).thenReturn(response(user, 123L));
-        when(repository.updateRemnawaveId(736L, 123L)).thenReturn(1);
+        when(repository.updateRemnawaveId(new java.util.UUID(0,736L), 123L)).thenReturn(1);
 
         var first = service.migrate();
         assertEquals(1, first.processed());
@@ -34,34 +34,34 @@ class RemnawaveIdMigrationServiceTest {
         assertTrue(first.errors().isEmpty());
         assertEquals(0, service.migrate().processed());
         verify(client, times(1)).getUser(user.remnawaveRef());
-        verify(repository, times(1)).updateRemnawaveId(736L, 123L);
+        verify(repository, times(1)).updateRemnawaveId(new java.util.UUID(0,736L), 123L);
         verify(repository, never()).save(any());
     }
 
     @Test
     void continuesAfterAnErrorAndDoesNotExposeResponseBody() {
-        BotUser missing = user(1L);
-        BotUser valid = user(2L);
+        RemnawaveSubscription missing = user(1L);
+        RemnawaveSubscription valid = user(2L);
         when(repository.findAllByRemnawaveIdIsNullOrderByIdAsc()).thenReturn(List.of(missing, valid));
         when(client.getUser(missing.remnawaveRef())).thenThrow(
                 new HttpClientErrorException(HttpStatus.NOT_FOUND, "SECRET RESPONSE"));
         when(client.getUser(valid.remnawaveRef())).thenReturn(response(valid, 22L));
-        when(repository.updateRemnawaveId(2L, 22L)).thenReturn(1);
+        when(repository.updateRemnawaveId(new java.util.UUID(0,2L), 22L)).thenReturn(1);
         when(repository.countByRemnawaveIdIsNull()).thenReturn(1L);
 
         var result = service.migrate();
         assertEquals(2, result.processed());
         assertEquals(1, result.updated());
         assertEquals(1, result.remaining());
-        assertEquals(List.of("1: HTTP 404"), result.errors());
+        assertEquals(List.of(new java.util.UUID(0,1) + ": HTTP 404"), result.errors());
         assertFalse(result.report().contains("SECRET"));
-        verify(repository, never()).updateRemnawaveId(eq(1L), any());
+        verify(repository, never()).updateRemnawaveId(eq(new java.util.UUID(0,1L)), any());
     }
 
     @Test
     void rejectsMismatchedUuidAndMissingId() {
-        BotUser first = user(1L);
-        BotUser second = user(2L);
+        RemnawaveSubscription first = user(1L);
+        RemnawaveSubscription second = user(2L);
         when(repository.findAllByRemnawaveIdIsNullOrderByIdAsc()).thenReturn(List.of(first, second));
         when(client.getUser(first.remnawaveRef())).thenReturn(RemnawaveUserResponse.builder().uuid("wrong").id(1L).build());
         when(client.getUser(second.remnawaveRef())).thenReturn(response(second, null));
@@ -73,8 +73,8 @@ class RemnawaveIdMigrationServiceTest {
 
     @Test
     void stopsOnAuthenticationFailure() {
-        BotUser first = user(1L);
-        BotUser second = user(2L);
+        RemnawaveSubscription first = user(1L);
+        RemnawaveSubscription second = user(2L);
         when(repository.findAllByRemnawaveIdIsNullOrderByIdAsc()).thenReturn(List.of(first, second));
         when(client.getUser(first.remnawaveRef())).thenThrow(new HttpClientErrorException(HttpStatus.UNAUTHORIZED));
         assertEquals(1, service.migrate().processed());
@@ -88,11 +88,11 @@ class RemnawaveIdMigrationServiceTest {
         verifyNoInteractions(repository, client);
     }
 
-    private BotUser user(Long id) {
-        return BotUser.builder().id(id).remnawaveUuid("uuid-" + id).build();
+    private RemnawaveSubscription user(Long id) {
+        return RemnawaveSubscription.builder().id(new java.util.UUID(0,id)).remnawaveUuid("uuid-" + id).build();
     }
 
-    private RemnawaveUserResponse response(BotUser user, Long id) {
+    private RemnawaveUserResponse response(RemnawaveSubscription user, Long id) {
         return RemnawaveUserResponse.builder().uuid(user.getRemnawaveUuid()).id(id).build();
     }
 }

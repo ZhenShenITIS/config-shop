@@ -14,8 +14,7 @@ import tg.configshop.exceptions.traffic.TrafficPackageNotFoundException;
 import tg.configshop.model.BotUser;
 import tg.configshop.model.Purchase;
 import tg.configshop.model.TrafficPackage;
-import tg.configshop.repositories.PurchaseRepository;
-import tg.configshop.repositories.TrafficPackageRepository;
+import tg.configshop.services.BalanceService;
 import tg.configshop.services.TrafficPackageService;
 import tg.configshop.services.UserService;
 
@@ -27,9 +26,8 @@ import java.util.List;
 public class TrafficPackageServiceImpl implements TrafficPackageService {
     private static final List<Integer> TRAFFIC_PACKAGE_SIZES = List.of(10, 30, 50, 100, 250, 500);
 
-    private final TrafficPackageRepository trafficPackageRepository;
+    private final BalanceService balanceService;
     private final UserService userService;
-    private final PurchaseRepository purchaseRepository;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final RemnawaveApiVersion apiVersion;
 
@@ -71,12 +69,13 @@ public class TrafficPackageServiceImpl implements TrafficPackageService {
 
     @Override
     public List<TrafficPackage> getAvailableTrafficPackages() {
-        return trafficPackageRepository.findAllByOrderByTrafficGbAsc();
+        return TRAFFIC_PACKAGE_SIZES.stream().map(this::getTrafficPackageByGb).toList();
     }
 
     @Override
     public TrafficPackage getTrafficPackageByGb(int trafficGb) throws TrafficPackageNotFoundException {
-        return trafficPackageRepository.findByTrafficGb(trafficGb).orElseThrow(TrafficPackageNotFoundException::new);
+        return TrafficPackage.builder().trafficGb(trafficGb).cost(getTrafficPackageCostByGb(trafficGb))
+                .name("Пакет трафика на " + trafficGb + " ГБ").build();
     }
 
     @Override
@@ -85,15 +84,12 @@ public class TrafficPackageServiceImpl implements TrafficPackageService {
         BotUser user = userService.getUser(userId);
         TrafficPackage trafficPackage = getTrafficPackageByGb(trafficGb);
 
-        if (user.getBalance() < trafficPackage.getCost()) {
-            throw new InsufficientBalanceException();
-        }
-
         apiVersion.select(user.remnawaveRef());
-        userService.decreaseBalance(userId, trafficPackage.getCost());
-        purchaseRepository.save(Purchase.builder()
+        balanceService.purchase(Purchase.builder()
                 .purchaseType(PurchaseType.TRAFFIC)
-                .botUser(user)
+                .account(user.getAccount())
+                .remnawaveSubscription(user.getSubscription())
+                .accountPriceRate(java.math.BigDecimal.ONE)
                 .paidAmount(trafficPackage.getCost())
                 .trafficGb(trafficPackage.getTrafficGb())
                 .build());

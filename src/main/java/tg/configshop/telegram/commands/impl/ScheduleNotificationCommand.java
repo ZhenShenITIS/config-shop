@@ -1,5 +1,7 @@
 package tg.configshop.telegram.commands.impl;
 
+import tg.configshop.services.ExternalSubscriptionService;
+
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import org.springframework.stereotype.Component;
@@ -19,6 +21,7 @@ import tg.configshop.telegram.commands.Command;
 public class ScheduleNotificationCommand implements Command {
     private final UserService userService;
     private final SchedulerService schedulerService;
+    private final ExternalSubscriptionService externalSubscriptionService;
 
     @Override
     public CommandName getCommand() {
@@ -43,7 +46,7 @@ public class ScheduleNotificationCommand implements Command {
             return;
         }
 
-        schedulerService.scheduleSubscriptionNotifications(botUser.getId(), botUser.getExpireAt());
+        schedulerService.scheduleSubscriptionNotifications(botUser.getId(), externalSubscriptionService.getExternalUser(botUser.getId()).expireAt());
         telegramClient.execute(SendMessage
                 .builder()
                 .chatId(message.getChatId())

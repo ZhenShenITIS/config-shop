@@ -1,5 +1,7 @@
 package tg.configshop.migration;
 
+import tg.configshop.services.ExternalSubscriptionService;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,6 +21,7 @@ public class NotificationMigration implements CommandLineRunner {
 
     private final BotUserRepository userRepository;
     private final SchedulerService schedulerService;
+    private final ExternalSubscriptionService externalSubscriptionService;
     @Value("${MIGRATION_NOTIFICATION}")
     private String flag;
 
@@ -43,19 +46,15 @@ public class NotificationMigration implements CommandLineRunner {
         for (BotUser user : users) {
             total++;
 
-            if (user.getExpireAt() == null) {
-                continue;
-            }
-            if (user.getExpireAt().isBefore(now)) {
-                expired++;
-                log.debug("User {} subscription expired, skipping", user.getId());
-                continue;
-            }
-
             try {
+                Instant expiry = externalSubscriptionService.getExternalUser(user.getId()).expireAt();
+                if (expiry == null || expiry.isBefore(now)) {
+                    expired++;
+                    continue;
+                }
                 schedulerService.scheduleSubscriptionNotifications(
                         user.getId(),
-                        user.getExpireAt()
+                        expiry
                 );
                 scheduled++;
                 log.debug("Scheduled notifications for user {}", user.getId());

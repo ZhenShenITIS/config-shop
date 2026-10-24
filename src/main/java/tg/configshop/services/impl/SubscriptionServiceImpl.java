@@ -15,11 +15,9 @@ import tg.configshop.model.BotUser;
 import tg.configshop.model.Purchase;
 import tg.configshop.model.Subscription;
 import tg.configshop.quartz.services.SchedulerService;
-import tg.configshop.repositories.PurchaseRepository;
-import tg.configshop.repositories.SubscriptionRepository;
+import tg.configshop.services.BalanceService;
 import tg.configshop.services.SubscriptionService;
 import tg.configshop.services.UserService;
-import tg.configshop.util.DateUtil;
 
 import java.time.Instant;
 
@@ -27,10 +25,9 @@ import java.time.Instant;
 @Service
 @RequiredArgsConstructor
 public class SubscriptionServiceImpl implements SubscriptionService {
-    private final SubscriptionRepository subscriptionRepository;
+    private final BalanceService balanceService;
     private final UserService userService;
     private final RemnawaveClient remnawaveClient;
-    private final PurchaseRepository purchaseRepository;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final RemnawaveApiVersion apiVersion;
     @Value("${MIN_DEVICE_COUNT}")
@@ -71,61 +68,36 @@ public class SubscriptionServiceImpl implements SubscriptionService {
 
     @Override
     @Transactional
-    public void buySubscription(Long userId, Long subscriptionId) throws InsufficientBalanceException {
+    public void buySubscription(Long userId, int days, int devices) throws InsufficientBalanceException {
         BotUser botUser = userService.getUser(userId);
-        Subscription subscription = subscriptionRepository.findById(subscriptionId).orElseThrow();
-        checkBalance(botUser, subscription);
+        Subscription subscription = getSubscriptionByDaysAndDevices(days, devices);
         apiVersion.select(botUser.remnawaveRef());
-
-        Instant newExpired = getNewExpired(botUser, subscription);
-        log.info("Updating sub for userId={}, oldExpire={}, newExpire={}",
-                userId,
-                DateUtil.getPrettyDate(botUser.getExpireAt()),
-                DateUtil.getPrettyDate(newExpired));
-        updateUser(botUser, subscription, newExpired);
+        Instant currentExpiry = remnawaveClient.getUser(botUser.remnawaveRef()).expireAt();
+        Instant now = Instant.now();
+        Instant newExpired = (currentExpiry.isAfter(now) ? currentExpiry : now)
+                .plusSeconds(days * 86400L);
+        balanceService.purchase(Purchase.builder().account(botUser.getAccount())
+                .remnawaveSubscription(botUser.getSubscription()).paidAmount(subscription.getCost())
+                .accountPriceRate(java.math.BigDecimal.ONE)
+                .subDays(days).subDevices(devices).build());
 
         applicationEventPublisher.publishEvent(new SubscriptionPaidEvent(botUser, subscription, newExpired));
 
-        savePurchase(botUser, subscription);
+
 
         schedulerService.scheduleSubscriptionNotifications(botUser.getId(), newExpired);
 
 
     }
 
-    private void checkBalance(BotUser botUser, Subscription subscription) {
-        if (botUser.getBalance() < subscription.getCost()) {
-            throw new InsufficientBalanceException();
-        }
-    }
-
-    private void updateUser(BotUser botUser, Subscription subscription, Instant newExpired) {
-        botUser.setBalance(botUser.getBalance() - subscription.getCost());
-        botUser.setExpireAt(newExpired);
-    }
-
-    private Instant getNewExpired(BotUser botUser, Subscription subscription) {
-        long durationSeconds = subscription.getDurationDays() * 24 * 60 * 60;
-        if (botUser.getExpireAt().isBefore(Instant.now())) {
-            return Instant.now().plusSeconds(durationSeconds);
-        } else {
-            return botUser.getExpireAt().plusSeconds(durationSeconds);
-        }
-    }
-
-
-    private void savePurchase(BotUser botUser, Subscription subscription) {
-        purchaseRepository.save(Purchase.builder()
-                .botUser(botUser)
-                .subscription(subscription)
-                .createdAt(Instant.now())
-                .paidAmount(subscription.getCost())
-                .build());
-    }
-
     @Override
     public Subscription getSubscriptionByDaysAndDevices(int days, int devices) throws SubscriptionNotFoundException {
-        return subscriptionRepository.findByDurationDaysAndDeviceCount(days, devices).orElseThrow(SubscriptionNotFoundException::new);
+        if (devices < getMinDeviceCount() || devices > getMaxDeviceCount()) throw new SubscriptionNotFoundException();
+        long cost = getBaseSubscriptionCostByDays(days)
+                + (long) Math.max(0, devices - getMinDeviceCount()) * getExtraPricePerDeviceByDays(days);
+        return Subscription.builder().durationDays(days).deviceCount(devices).cost(cost)
+                .trafficLimitGb(devices * getTrafficLimitPerDevice())
+                .name("Подписка на " + days + " дней и " + devices + " устройств").build();
     }
 
     @Override

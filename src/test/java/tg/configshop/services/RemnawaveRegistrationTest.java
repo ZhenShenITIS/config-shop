@@ -1,5 +1,8 @@
 package tg.configshop.services;
 
+import tg.configshop.repositories.RemnawaveSubscriptionRepository;
+import tg.configshop.repositories.AccountRepository;
+
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.HttpStatus;
@@ -19,6 +22,8 @@ import static org.mockito.Mockito.*;
 
 class RemnawaveRegistrationTest {
     private final BotUserRepository repository = mock(BotUserRepository.class);
+    private final AccountRepository accounts = mock(AccountRepository.class);
+    private final RemnawaveSubscriptionRepository subscriptions = mock(RemnawaveSubscriptionRepository.class);
     private final ReferralService referrals = mock(ReferralService.class);
     private final RemnawaveClient client = mock(RemnawaveClient.class);
     private final SchedulerService scheduler = mock(SchedulerService.class);
@@ -46,7 +51,7 @@ class RemnawaveRegistrationTest {
         assertEquals(123L, user.getRemnawaveId());
         verify(client).getUserByUsername("736");
         verify(scheduler, never()).scheduleTrialTrafficChecks(anyLong());
-        verify(scheduler).scheduleSubscriptionNotifications(736L, user.getExpireAt());
+        verify(scheduler).scheduleSubscriptionNotifications(736L, response(version, 123L).expireAt());
     }
 
     @ParameterizedTest
@@ -54,11 +59,14 @@ class RemnawaveRegistrationTest {
     void doesNotSaveRegistrationWithoutId(int version) {
         when(client.createBasicUser("736", 736L)).thenReturn(response(version, null));
         assertThrows(IllegalStateException.class, () -> service(version).registerUser(telegramUser(), null));
-        verifyNoInteractions(repository, referrals, scheduler);
+        verify(repository, never()).save(any());
+        verifyNoInteractions(referrals, scheduler, accounts, subscriptions);
     }
 
     private RegistrationServiceImpl service(int version) {
-        return new RegistrationServiceImpl(repository, referrals, client, scheduler, new RemnawaveApiVersion(version));
+        when(accounts.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(subscriptions.save(any())).thenAnswer(i -> i.getArgument(0));
+        return new RegistrationServiceImpl(repository, accounts, subscriptions, referrals, client, scheduler, new RemnawaveApiVersion(version));
     }
 
     private User telegramUser() {

@@ -3,82 +3,28 @@ package tg.configshop.services.impl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tg.configshop.services.*;
+import tg.configshop.repositories.*;
+import tg.configshop.model.*;
 import tg.configshop.constants.TopUpSource;
-import tg.configshop.exceptions.subscription.InsufficientBalanceException;
 import tg.configshop.external_api.remnawave.dto.user.RemnawaveUserResponse;
-import tg.configshop.model.BotUser;
-import tg.configshop.model.TopUp;
-import tg.configshop.repositories.BotUserRepository;
-import tg.configshop.repositories.TopUpRepository;
-import tg.configshop.services.UserService;
+import java.util.*;
 
-import java.util.List;
-import java.util.Objects;
-
-@Service
-@RequiredArgsConstructor
+@Service @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
     private final BotUserRepository botUserRepository;
-    private final TopUpRepository topUpRepository;
-
-    @Transactional
-    @Override
-    public void addToBalanceAsAdminTopUp(Long userId, Long amountToAdd) {
-        addBalance(userId, amountToAdd);
-        topUpRepository.save(TopUp
-                .builder()
-                        .botUser(botUserRepository.getReferenceById(userId))
-                        .value(amountToAdd)
-                        .topUpSource(TopUpSource.ADMIN)
-                .build());
-
+    private final BalanceService balanceService;
+    @Override @Transactional
+    public void addToBalanceAsAdminTopUp(Long userId, Long amount) {
+        balanceService.credit(TopUp.builder().account(getUser(userId).getAccount()).value(amount)
+            .topUpSource(TopUpSource.ADMIN).build());
     }
-
-    @Override
-    public BotUser getUser(Long userId) {
-        return botUserRepository.findById(userId).orElse(null);
-    }
-
-    @Override
-    public List<BotUser> getUser(String username) {
-        return botUserRepository.findByUsernameIgnoreCase(username);
-    }
-
-    @Override
-    public void decreaseBalance(Long userId, Long amount) throws InsufficientBalanceException {
-        BotUser user = botUserRepository.findByIdWithLock(userId)
-                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
-        if (user.getBalance() < amount) {
-            throw new InsufficientBalanceException("Insufficient balance");
-        }
-        user.setBalance(user.getBalance() - amount);
-        botUserRepository.save(user);
-    }
-
-    @Override
-    public List<BotUser> getAllUsers() {
-        return botUserRepository.findAll();
-    }
-
-    @Override
-    public void syncRemnawaveUserWithLocalUser(RemnawaveUserResponse userResponse, BotUser botUser) {
-        if (botUser.getRemnawaveId() != null && !Objects.equals(botUser.getRemnawaveId(), userResponse.id())) {
-            throw new IllegalStateException("Conflicting Remnawave ID for local user " + botUser.getId());
-        }
-        botUser.setExpireAt(userResponse.expireAt());
-        botUserRepository.save(botUser);
-    }
-
-    @Override
-    @Transactional
-    public void addToBalance(Long userId, Long amountToAdd) {
-        addBalance(userId, amountToAdd);
-    }
-
-    private void addBalance (Long userId, Long amountToAdd) {
-        BotUser user = botUserRepository.findByIdWithLock(userId)
-                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
-        user.setBalance(user.getBalance() + amountToAdd);
-        botUserRepository.save(user);
+    @Override public long getBalance(Long userId) { return balanceService.balance(getUser(userId).getAccount().getId()); }
+    @Override public BotUser getUser(Long userId) { return botUserRepository.findById(userId).orElse(null); }
+    @Override public List<BotUser> getUser(String username) { return botUserRepository.findByUsernameIgnoreCase(username); }
+    @Override public List<BotUser> getAllUsers() { return botUserRepository.findAll(); }
+    @Override public void syncRemnawaveUserWithLocalUser(RemnawaveUserResponse response, BotUser user) {
+        if (user.getRemnawaveId() != null && !Objects.equals(user.getRemnawaveId(), response.id()))
+            throw new IllegalStateException("Conflicting Remnawave ID for user " + user.getId());
     }
 }

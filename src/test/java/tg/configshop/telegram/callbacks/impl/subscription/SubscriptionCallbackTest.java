@@ -39,16 +39,12 @@ class SubscriptionCallbackTest {
         String jsonKey = "happ://crypt4/json-key";
         String nonJsonKey = "happ://crypt4/non-json-key";
         long userId = 42L;
-        BotUser botUser = BotUser.builder()
-                .id(userId)
-                .remnawaveUuid("remote-user")
-                .expireAt(Instant.now().plus(30, ChronoUnit.DAYS))
-                .build();
+        BotUser botUser = tg.configshop.TestUsers.user(736L, "remote-user", 123L);
         RemnawaveUserResponse response = RemnawaveUserResponse.builder()
                 .uuid(botUser.getRemnawaveUuid())
                 .telegramId(userId)
                 .subscriptionUrl(rawUrl)
-                .expireAt(botUser.getExpireAt())
+                .expireAt(Instant.now().plus(30, ChronoUnit.DAYS))
                 .hwidDeviceLimit(3)
                 .trafficLimitBytes(0L)
                 .userTraffic(new UserTraffic(0L, 0L))

@@ -13,16 +13,12 @@ import tg.configshop.constants.ButtonText;
 import tg.configshop.constants.CallbackName;
 import tg.configshop.constants.MessageText;
 import tg.configshop.dto.RemnawaveUser;
-import tg.configshop.external_api.remnawave.RemnawaveClient;
 import tg.configshop.external_api.remnawave.dto.device.Device;
-import tg.configshop.external_api.remnawave.dto.user.RemnawaveUserResponse;
 import tg.configshop.model.BotUser;
 import tg.configshop.services.DeviceService;
 import tg.configshop.services.ExternalSubscriptionService;
 import tg.configshop.services.UserService;
 import tg.configshop.telegram.callbacks.Callback;
-import tg.configshop.util.DateUtil;
-import tg.configshop.util.RsaEncryptor;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -76,7 +72,7 @@ public class SubscriptionCallback implements Callback {
         String text = temp.formatted(
                 callbackQuery.getFrom().getFirstName(),
                 botUser.getId(),
-                botUser.getBalance(),
+                userService.getBalance(botUser.getId()),
                 statusEmoji, dateEnd, daysLeft,
                 usedTrafficGb, limitTrafficGb,
                 devices.size(), maxDevices,

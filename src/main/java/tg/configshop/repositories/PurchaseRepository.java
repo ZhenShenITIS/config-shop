@@ -1,81 +1,26 @@
 package tg.configshop.repositories;
 
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
+import org.springframework.data.domain.*;
+import org.springframework.data.jpa.repository.*;
 import tg.configshop.dto.OperationView;
 import tg.configshop.model.Purchase;
-
-public interface PurchaseRepository extends JpaRepository<Purchase, Long> {
+import java.util.UUID;
+public interface PurchaseRepository extends JpaRepository<Purchase, UUID> {
     @Query(value = """
-            WITH operations AS (
-            SELECT value AS amount,
-            created_at AS date,
-            'TOP_UP' AS operationType,
-            top_up_source AS topUpSource,
-            NULL AS purchaseType,
-            NULL AS deviceCount,
-            NULL AS durationDays,
-            NULL AS trafficGb,
-            NULL AS withdrawalStatus,
-            NULL AS withdrawalType
-            FROM shop_db.public.top_ups where bot_user_id = :userId
-            
-            UNION ALL
-            
-            SELECT paid_amount AS amount,
-            created_at AS date,
-            'PURCHASE' AS operationType,
-            NULL AS topUpSource,
-            purchases.purchase_type AS purchaseType,
-            (CASE purchase_type
-                WHEN 'SUBSCRIPTION' THEN s.device_count
-                WHEN 'DEVICE' THEN purchases.device_count
-                ELSE 0
-            END) AS deviceCount,
-            (CASE purchase_type
-                WHEN 'SUBSCRIPTION' THEN s.duration_days
-                ELSE 0
-            END) AS durationDays,
-            (CASE purchase_type
-                WHEN 'TRAFFIC' THEN purchases.traffic_gb
-                ELSE 0
-            END) AS trafficGb,
-            NULL AS withdrawalStatus,
-            NULL AS withdrawalType
-            FROM shop_db.public.purchases
-            LEFT JOIN public.subscriptions s on s.id = purchases.subscription_id
-            where bot_user_id = :userId
-            
-            UNION ALL
-            
-            SELECT
-            w.amount AS amount,
-            w.created_at AS date,
-            'WITHDRAW' AS operationType,
-            NULL AS topUpSource,
-            NULL AS purchaseType,
-            NULL AS deviceCount,
-            NULL AS durationDays,
-            NULL AS trafficGb,
-            w.status AS withdrawalStatus,
-            w.type AS withdrawalType
-            FROM withdrawals w
-            WHERE bot_user_id = :userId
-            )
-            
-            
-            SELECT * FROM operations ORDER BY operations.date DESC;
-            """,
-            countQuery = """
-            SELECT (
-                (SELECT COUNT(*) FROM top_ups WHERE bot_user_id = :userId) +
-                (SELECT COUNT(*) FROM purchases WHERE bot_user_id = :userId) +
-                (SELECT COUNT(*) FROM withdrawals WHERE bot_user_id = :userId)
-            )
-            """,
-            nativeQuery = true)
-    Page<OperationView> findOperationsByUserId (@Param("userId") Long userId, Pageable pageable);
+        SELECT l.amount AS amount, l.type AS ledgerType, l.created_at AS date,
+          CASE WHEN l.purchase_id IS NOT NULL THEN 'PURCHASE'
+               WHEN l.withdrawal_id IS NOT NULL AND l.type = 'WITHDRAWAL' THEN 'WITHDRAW'
+               ELSE 'TOP_UP' END AS operationType,
+          CASE WHEN l.type = 'WITHDRAWAL_REJECT' THEN 'ADMIN' ELSE t.top_up_source END AS topUpSource,
+          p.type AS purchaseType, coalesce(p.sub_devices, p.device_count) AS deviceCount,
+          p.sub_days AS durationDays, p.traffic_gb AS trafficGb,
+          w.status AS withdrawalStatus,
+          w.type AS withdrawalType
+        FROM balance_log l
+        LEFT JOIN top_ups t ON t.id = l.top_up_id
+        LEFT JOIN purchases p ON p.id = l.purchase_id
+        LEFT JOIN withdrawals w ON w.id = l.withdrawal_id
+        WHERE l.account_id = :accountId ORDER BY l.created_at DESC, l.id DESC
+        """, countQuery = "select count(*) from balance_log where account_id = :accountId", nativeQuery = true)
+    Page<OperationView> findOperationsByUserId(UUID accountId, Pageable pageable);
 }

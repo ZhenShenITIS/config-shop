@@ -1,12 +1,15 @@
 package tg.configshop.quartz.jobs;
 
+import tg.configshop.repositories.RemnawaveSubscriptionRepository;
+import tg.configshop.model.RemnawaveSubscription;
+import tg.configshop.external_api.remnawave.RemnawaveClient;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.quartz.Job;
 import org.quartz.JobDataMap;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
@@ -30,6 +33,8 @@ import java.time.Instant;
 @RequiredArgsConstructor
 public class SubscriptionExpiryNotificationJob implements Job {
     private final BotUserRepository userRepository;
+    private final RemnawaveSubscriptionRepository subscriptions;
+    private final RemnawaveClient remnawaveClient;
 
     private final TelegramClient telegramClient;
 
@@ -52,16 +57,13 @@ public class SubscriptionExpiryNotificationJob implements Job {
             return;
         }
 
-        if (!isSameExpireAt(user.getExpireAt(), targetExpireAt)) {
-            log.info("User {} expireAt changed from {} to {}, skipping outdated notification",
-                    userId, targetExpireAt, user.getExpireAt());
-            return;
-        }
-
-        if (DateUtil.isExpired(user)) {
-            log.info("User {} subscription already expired", userId);
-            return;
-        }
+        RemnawaveSubscription subscription = dataMap.containsKey("subscriptionId")
+                ? subscriptions.findById(java.util.UUID.fromString(dataMap.getString("subscriptionId"))).orElseThrow()
+                : user.getSubscription();
+        if (!subscription.getAccount().getId().equals(user.getAccount().getId()))
+            throw new JobExecutionException("Subscription owner mismatch");
+        Instant expiry = remnawaveClient.getUser(subscription.remnawaveRef()).expireAt();
+        if (!isSameExpireAt(expiry, targetExpireAt) || DateUtil.isExpired(expiry)) return;
         sendMessage(user, notificationType);
         log.info("Notification sent to user {}", userId);
     }

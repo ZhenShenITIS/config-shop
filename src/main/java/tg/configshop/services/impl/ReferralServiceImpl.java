@@ -1,5 +1,7 @@
 package tg.configshop.services.impl;
 
+import tg.configshop.services.BalanceService;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
@@ -9,7 +11,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tg.configshop.constants.TopUpSource;
 import tg.configshop.dto.ReferralView;
-import tg.configshop.dto.ReferralWithProfit;
 import tg.configshop.dto.ReferralWithProfitAndLevel;
 import tg.configshop.events.ReferralCreatedEvent;
 import tg.configshop.model.BotUser;
@@ -23,12 +24,8 @@ import tg.configshop.repositories.TopUpRepository;
 import tg.configshop.repositories.WithdrawalRepository;
 import tg.configshop.services.ReferralService;
 
-import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -43,6 +40,7 @@ public class ReferralServiceImpl implements ReferralService {
 
 
     private final WithdrawalRepository withdrawalRepository;
+    private final BalanceService balanceService;
 
     private final String PROMO_CODE_PREFIX = "REF_";
     private final long REFERRAL_PROMO_CODE_BASE_AMOUNT = 100L;
@@ -51,13 +49,13 @@ public class ReferralServiceImpl implements ReferralService {
     @Override
     @Transactional
     public void createReferral(Long referrerId, Long referralId) {
-        Optional<Referral> existingReferral = referralRepository.findByReferral_Id(referralId);
+        Optional<Referral> existingReferral = referralRepository.findByReferral_Id(botUserRepository.findById(referralId).orElseThrow().getAccount().getId());
 
         if (existingReferral.isEmpty()) {
             referralRepository.save(Referral
                     .builder()
-                    .referrer(botUserRepository.getReferenceById(referrerId))
-                    .referral(botUserRepository.getReferenceById(referralId))
+                    .referrer(botUserRepository.getReferenceById(referrerId).getAccount())
+                    .referral(botUserRepository.getReferenceById(referralId).getAccount())
                     .build());
             eventPublisher.publishEvent(new ReferralCreatedEvent(this, referrerId, referralId));
         }
@@ -65,46 +63,40 @@ public class ReferralServiceImpl implements ReferralService {
 
     @Override
     public void createReferralCode(Long userId) {
+        if (promoCodeRepository.findByCode(PROMO_CODE_PREFIX + userId).isPresent()) return;
         promoCodeRepository.save(PromoCode
                 .builder()
                 .code(PROMO_CODE_PREFIX + userId)
                 .isReferral(true)
                 .amount(REFERRAL_PROMO_CODE_BASE_AMOUNT)
                 .maxUses(1000)
-                .referrer(botUserRepository.getReferenceById(userId))
+                .referrer(botUserRepository.getReferenceById(userId).getAccount())
                 .build()
         );
     }
 
     @Override
     public int getAllReferralCount(Long userId) {
-        return referralRepository.countReferralsByReferrer_Id(userId);
-    }
-
-    @Override
-    public int getActiveReferralCount(Long userId) {
-        return referralRepository.countActiveReferrals(userId, Instant.now());
+        return referralRepository.countReferralsByReferrer_Id(botUserRepository.findById(userId).orElseThrow().getAccount().getId());
     }
 
     @Override
     public long getAllProfit(Long userId) {
-        return topUpRepository.getSumByUserIdAndSource(userId, TopUpSource.REFERRAL);
+        return topUpRepository.getSumByUserIdAndSource(botUserRepository.findById(userId).orElseThrow().getAccount().getId(), TopUpSource.REFERRAL);
     }
 
     @Override
     public List<String> getReferralPromoCodes(Long userId) {
-        return promoCodeRepository.findCodesByReferrer(botUserRepository.getReferenceById(userId));
+        return promoCodeRepository.findCodesByReferrer(botUserRepository.getReferenceById(userId).getAccount());
     }
 
     @Override
     public Long getAvailableSumToWithdraw(Long userId) {
-        Long totalReferralEarnings = topUpRepository.getSumByUserIdAndSource(userId, TopUpSource.REFERRAL);
-        Long totalWithdrawnOrPending = withdrawalRepository.sumConsumedReferralBalance(userId);
+        Long totalReferralEarnings = topUpRepository.getSumByUserIdAndSource(botUserRepository.findById(userId).orElseThrow().getAccount().getId(), TopUpSource.REFERRAL);
+        Long totalWithdrawnOrPending = withdrawalRepository.sumConsumedReferralBalance(botUserRepository.findById(userId).orElseThrow().getAccount().getId());
         long theoreticalReferralBalance = Math.max(0, totalReferralEarnings - totalWithdrawnOrPending);
 
-        Long currentWalletBalance = botUserRepository.findById(userId)
-                .map(BotUser::getBalance)
-                .orElse(0L);
+        long currentWalletBalance = balanceService.balance(botUserRepository.findById(userId).orElseThrow().getAccount().getId());
         return Math.min(theoreticalReferralBalance, currentWalletBalance);
     }
 
@@ -112,13 +104,12 @@ public class ReferralServiceImpl implements ReferralService {
     public Page<ReferralWithProfitAndLevel> getReferralsWithProfitAndLevel(Long userId, int pageNumber) {
         Pageable pageable = PageRequest.of(pageNumber, REFERRAL_PAGE_SIZE);
 
-        Page<ReferralView> viewPage = referralRepository.findReferralsProjection(userId, pageable);
+        Page<ReferralView> viewPage = referralRepository.findReferralsProjection(botUserRepository.findById(userId).orElseThrow().getAccount().getId(), pageable);
 
         return viewPage.map(view -> {
             BotUser tempUser = BotUser.builder()
-                    .id(view.getUserId())
-                    .firstName(view.getFirstName())
-                    .expireAt(view.getExpireAt())
+                    .telegramId(view.getUserId())
+                    .name(view.getFirstName())
                     .build();
 
             return new ReferralWithProfitAndLevel(
@@ -132,14 +123,14 @@ public class ReferralServiceImpl implements ReferralService {
 
     @Override
     public Optional<PromoCode> getUsedPromo(Long userId) {
-        return promoCodeUseRepository.findReferralPromoUse(userId);
+        return promoCodeUseRepository.findReferralPromoUse(botUserRepository.findById(userId).orElseThrow().getAccount().getId());
     }
 
     @Override
     public Optional<Long> getReferrerId(Long userId) {
-        Referral referral = referralRepository.findByReferral_Id(userId).orElse(null);
+        Referral referral = referralRepository.findByReferral_Id(botUserRepository.findById(userId).orElseThrow().getAccount().getId()).orElse(null);
         if (referral != null) {
-            return Optional.of(referral.getReferrer().getId());
+            return botUserRepository.findFirstByAccount_IdOrderByTelegramIdAsc(referral.getReferrer().getId()).map(BotUser::getId);
         }
         return Optional.empty();
     }

@@ -1,5 +1,10 @@
 package tg.configshop.services.impl;
 
+import tg.configshop.repositories.RemnawaveSubscriptionRepository;
+import tg.configshop.repositories.AccountRepository;
+import tg.configshop.model.RemnawaveSubscription;
+import tg.configshop.model.Account;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -19,6 +24,8 @@ import tg.configshop.services.RegistrationService;
 @Slf4j
 public class RegistrationServiceImpl implements RegistrationService {
     private final BotUserRepository botUserRepository;
+    private final AccountRepository accounts;
+    private final RemnawaveSubscriptionRepository subscriptions;
     private final ReferralService referralService;
     private final RemnawaveClient remnawaveClient;
     private final SchedulerService schedulerService;
@@ -30,23 +37,28 @@ public class RegistrationServiceImpl implements RegistrationService {
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional
     public BotUser registerUser(User user, Long referrerId) {
+        BotUser existing = botUserRepository.findById(user.getId()).orElse(null);
+        if (existing != null) return existing;
         String remnawaveUsername = user.getId().toString();
         RemnawaveRegistrationResult remnawaveRegistration = getOrCreateRemnawaveUser(remnawaveUsername, user.getId());
         RemnawaveUserResponse remnaUser = remnawaveRegistration.user();
         if (remnaUser == null || remnaUser.id() == null || remnaUser.id() <= 0) {
             throw new IllegalStateException("Remnawave did not return a positive user ID");
         }
+        Account account = accounts.save(Account.builder().build());
+        RemnawaveSubscription subscription = subscriptions.save(RemnawaveSubscription.builder()
+                .account(account).remnawaveUuid(remnaUser.uuid()).remnawaveId(remnaUser.id())
+                .shortId(remnaUser.shortUuid()).build());
+        account.getSubscriptions().add(subscription);
         BotUser botUser = BotUser
                 .builder()
                 .username(user.getUserName())
-                .id(user.getId())
-                .firstName(user.getFirstName())
+                .telegramId(user.getId())
+                .name(user.getFirstName())
                 .lastName(user.getLastName())
-                .remnawaveUuid(remnaUser.uuid())
-                .remnawaveId(remnaUser.id())
-                .shortId(remnaUser.shortUuid())
-                .expireAt(remnaUser.expireAt())
+                .account(account)
                 .build();
         apiVersion.select(botUser.remnawaveRef());
         botUserRepository.save(botUser);

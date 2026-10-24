@@ -41,12 +41,12 @@ public class CheckStatusPaymentCallback implements Callback {
         String callbackId = callbackQuery.getId();
         long now = System.currentTimeMillis();
         PaymentContext paymentContext = stateRepository.getPaymentContext(userId);
-        if (!(now - DELAY_BETWEEN_CHECKS > paymentContext.lastCheckTime())) {
+        if (paymentContext != null && !(now - DELAY_BETWEEN_CHECKS > paymentContext.lastCheckTime())) {
             answerQuery(callbackId, MessageText.PROCESSING_PAY.getMessageText(), telegramClient);
             log.info("Requests for payment status updates are too frequent. UserId: {}", userId);
             return;
         }
-        stateRepository.putPaymentContext(userId, new PaymentContext(paymentContext.paymentMethod(), now));
+        stateRepository.putPaymentContext(userId, new PaymentContext(paymentContext == null ? null : paymentContext.paymentMethod(), now));
         long chatId = callbackQuery.getMessage().getChatId();
         int messageId = callbackQuery.getMessage().getMessageId();
 
@@ -70,6 +70,8 @@ public class CheckStatusPaymentCallback implements Callback {
                     editMessage(chatId, messageId, MessageText.CANCELED_PAY.getMessageText(), telegramClient);
             case PROCESSING ->
                 answerQuery(callbackId, MessageText.PROCESSING_PAY.getMessageText(), telegramClient);
+            case MANUAL_REVIEW ->
+               answerQuery(callbackId, MessageText.MANUAL_REVIEW_PAY.getMessageText(), telegramClient);
             case EXPIRED ->
                answerQuery(callbackId, MessageText.EXPIRED_PAY.getMessageText(), telegramClient);
 

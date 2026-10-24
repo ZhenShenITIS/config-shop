@@ -1,5 +1,5 @@
 package tg.configshop.constants;
 
 public enum PaymentResult {
-    PROCESSING, EXPIRED, CONFIRMED, CANCELED
+    PROCESSING, MANUAL_REVIEW, EXPIRED, CONFIRMED, CANCELED
 }

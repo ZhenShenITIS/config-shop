@@ -10,6 +10,6 @@ public interface SubscriptionService {
     int getMaxDeviceCount ();
     int getExtraPricePerDeviceByDays (int days) throws SubscriptionNotFoundException;
     int getTrafficLimitPerDevice ();
-    void buySubscription(Long userId, Long subscriptionId) throws InsufficientBalanceException;
+    void buySubscription(Long userId, int days, int devices) throws InsufficientBalanceException;
     Subscription getSubscriptionByDaysAndDevices (int days, int devices) throws SubscriptionNotFoundException;
 }

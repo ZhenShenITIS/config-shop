@@ -1,5 +1,7 @@
 package tg.configshop.dto;
 
+import tg.configshop.constants.BalanceLogType;
+
 import tg.configshop.constants.OperationType;
 import tg.configshop.constants.PurchaseType;
 import tg.configshop.constants.TopUpSource;
@@ -10,6 +12,7 @@ import java.time.Instant;
 
 public interface OperationView {
     Long getAmount();
+    BalanceLogType getLedgerType();
     Instant getDate();
     OperationType getOperationType();
 

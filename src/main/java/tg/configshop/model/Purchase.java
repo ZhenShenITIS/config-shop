@@ -1,47 +1,52 @@
 package tg.configshop.model;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.EnumType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import tg.configshop.constants.PurchaseType;
-
 import java.time.Instant;
+import java.util.UUID;
+import java.math.BigDecimal;
+import tg.configshop.constants.PurchaseType;
 
 @Entity
 @Getter
 @Setter
 @Builder
-@AllArgsConstructor
 @NoArgsConstructor
+@AllArgsConstructor
 @Table(name = "purchases")
 public class Purchase {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
     private Long paidAmount;
     @ManyToOne
-    @JoinColumn(name = "subscription_id")
-    private Subscription subscription;
+    private Account account;
     @ManyToOne
-    @JoinColumn(name = "bot_user_id")
-    private BotUser botUser;
+    private RemnawaveSubscription remnawaveSubscription;
+    @Column(precision = 12, scale = 6)
+    @Builder.Default
+    private BigDecimal accountPriceRate = BigDecimal.ONE;
     @Builder.Default
     private Instant createdAt = Instant.now();
     @Builder.Default
     @Enumerated(EnumType.STRING)
-    // DEVICE, SUBSCRIPTION, TRAFFIC
+    @Column(name = "type")
     private PurchaseType purchaseType = PurchaseType.SUBSCRIPTION;
+    private Integer subDays;
+    private Integer subDevices;
     private Integer deviceCount;
     private Integer trafficGb;
+
 }

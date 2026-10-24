@@ -1,36 +1,36 @@
 package tg.configshop.model;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToOne;
-import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-
 import java.time.Instant;
+import java.util.UUID;
+
 
 @Entity
 @Getter
 @Setter
 @Builder
-@AllArgsConstructor
 @NoArgsConstructor
-@Table(name = "promo_code_uses", uniqueConstraints = @UniqueConstraint(columnNames = {"promo_code_id", "bot_user_id"}))
+@AllArgsConstructor
+@Table(name = "promo_code_uses")
 public class PromoCodeUse {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
     @ManyToOne
     private PromoCode promoCode;
     @ManyToOne
-    private BotUser botUser;
+    private Account account;
     @Builder.Default
     private Instant createdAt = Instant.now();
+
 }
