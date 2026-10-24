@@ -18,7 +18,7 @@ public class PaymentPollingService {
     private final PlategaPaymentRepository payments;
     private final PaymentService paymentService;
 
-    @Scheduled(fixedDelay = 30_000)
+    @Scheduled(fixedDelayString = "${payments.polling.interval:30s}")
     public void checkPendingPayments() {
         var createdBefore = Instant.now();
         var page = PageRequest.of(0, 100);
