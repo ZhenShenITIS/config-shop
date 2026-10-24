@@ -1,10 +1,8 @@
 package tg.configshop.dto;
-
 import java.time.Instant;
-
+import java.util.UUID;
 public interface ReferralView {
-    Long getUserId();
-    String getFirstName();
+    UUID getAccountId();
     Long getProfit();
     Instant getReferredAt();
     Integer getLvl();

@@ -16,8 +16,8 @@ public interface PromoCodeUseRepository extends JpaRepository<PromoCodeUse, UUID
     @Query(value = """
     SELECT pcu.promoCode
     FROM PromoCodeUse pcu
-    WHERE pcu.account.id = :userId
+    WHERE pcu.account.id = :accountId
         AND pcu.promoCode.isReferral = true
     """)
-    Optional<PromoCode> findReferralPromoUse(UUID userId);
+    Optional<PromoCode> findReferralPromoUse(UUID accountId);
 }

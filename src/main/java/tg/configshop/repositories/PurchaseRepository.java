@@ -22,5 +22,5 @@ public interface PurchaseRepository extends JpaRepository<Purchase, UUID> {
         LEFT JOIN withdrawals w ON w.id = l.withdrawal_id
         WHERE l.account_id = :accountId ORDER BY l.created_at DESC, l.id DESC
         """, countQuery = "select count(*) from balance_log where account_id = :accountId", nativeQuery = true)
-    Page<OperationView> findOperationsByUserId(UUID accountId, Pageable pageable);
+    Page<OperationView> findOperationsByAccountId(UUID accountId, Pageable pageable);
 }

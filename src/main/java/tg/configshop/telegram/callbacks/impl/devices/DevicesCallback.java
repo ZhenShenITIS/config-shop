@@ -12,11 +12,11 @@ import tg.configshop.constants.ButtonText;
 import tg.configshop.constants.CallbackName;
 import tg.configshop.constants.MessageText;
 import tg.configshop.external_api.remnawave.RemnawaveClient;
-import tg.configshop.external_api.remnawave.dto.device.Device;
+import tg.configshop.dto.DeviceView;
 import tg.configshop.external_api.remnawave.dto.user.RemnawaveUserResponse;
 import tg.configshop.model.BotUser;
 import tg.configshop.services.DeviceService;
-import tg.configshop.services.UserService;
+import tg.configshop.telegram.TelegramUserService;
 import tg.configshop.telegram.callbacks.Callback;
 
 import java.util.List;
@@ -25,8 +25,8 @@ import java.util.stream.Collectors;
 @Component
 @RequiredArgsConstructor
 public class DevicesCallback implements Callback {
-    private final UserService userService;
-    private final RemnawaveClient remnawaveClient;
+    private final TelegramUserService userService;
+    private final tg.configshop.services.ExternalSubscriptionService externalSubscriptionService;
     private final DeviceService deviceService;
 
     @Override
@@ -39,8 +39,8 @@ public class DevicesCallback implements Callback {
         Long userId = callbackQuery.getFrom().getId();
         BotUser botUser = userService.getUser(userId);
 
-        List<Device> devices = deviceService.getDevicesByUserId(userId);
-        RemnawaveUserResponse remoteUser = remnawaveClient.getUser(botUser.remnawaveRef());
+        List<DeviceView> devices = deviceService.getDevices(userService.accountId(userId), userService.subscriptionId(userId));
+        var remoteUser = externalSubscriptionService.getExternalUser(userService.accountId(userId), userService.subscriptionId(userId));
         int maxDevices = remoteUser.hwidDeviceLimit();
 
         String devicesText;

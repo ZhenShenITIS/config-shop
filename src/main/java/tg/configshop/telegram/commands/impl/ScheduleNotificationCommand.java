@@ -12,14 +12,14 @@ import tg.configshop.aop.AdminOnly;
 import tg.configshop.constants.CommandName;
 import tg.configshop.model.BotUser;
 import tg.configshop.quartz.services.SchedulerService;
-import tg.configshop.services.UserService;
+import tg.configshop.telegram.TelegramUserService;
 import tg.configshop.telegram.commands.Command;
 
 
 @Component
 @RequiredArgsConstructor
 public class ScheduleNotificationCommand implements Command {
-    private final UserService userService;
+    private final TelegramUserService userService;
     private final SchedulerService schedulerService;
     private final ExternalSubscriptionService externalSubscriptionService;
 
@@ -46,7 +46,9 @@ public class ScheduleNotificationCommand implements Command {
             return;
         }
 
-        schedulerService.scheduleSubscriptionNotifications(botUser.getId(), externalSubscriptionService.getExternalUser(botUser.getId()).expireAt());
+        var accountId = userService.accountId(botUser.getId());
+        var subscriptionId = userService.subscriptionId(botUser.getId());
+        schedulerService.scheduleSubscriptionNotifications(accountId, subscriptionId, externalSubscriptionService.getExternalUser(accountId, subscriptionId).expireAt());
         telegramClient.execute(SendMessage
                 .builder()
                 .chatId(message.getChatId())

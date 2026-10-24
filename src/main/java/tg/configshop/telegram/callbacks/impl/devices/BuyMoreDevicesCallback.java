@@ -1,6 +1,7 @@
 package tg.configshop.telegram.callbacks.impl.devices;
 
 import lombok.RequiredArgsConstructor;
+import tg.configshop.telegram.TelegramUserService;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
@@ -23,7 +24,8 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 public class BuyMoreDevicesCallback implements Callback {
-    private final ExternalSubscriptionService externalSubscriptionService;
+    private final TelegramUserService userService;
+    private final tg.configshop.services.DevicePurchaseService devicePurchaseService;
     private final SubscriptionService subscriptionService;
 
     @Override
@@ -37,50 +39,22 @@ public class BuyMoreDevicesCallback implements Callback {
 
         try {
 
-            RemnawaveUser user = externalSubscriptionService.getExternalUser(userId);
-
-
-            if (!user.isActive() || user.daysLeft() <= 0) {
-                sendNoSubscriptionMessage(callbackQuery, telegramClient);
-                return;
-            }
-
-
-            int maxDevices = subscriptionService.getMaxDeviceCount();
-            int currentDevices = user.hwidDeviceLimit();
-            int availableDevices = maxDevices - currentDevices;
-
+            var offer = devicePurchaseService.options(userService.accountId(userId), userService.subscriptionId(userId));
+            int availableDevices = offer.availableDevices();
             if (availableDevices <= 0) {
-                sendMaxDevicesReachedMessage(callbackQuery, telegramClient, currentDevices);
+                sendMaxDevicesReachedMessage(callbackQuery, telegramClient, offer.currentDevices());
                 return;
             }
-
-
-            int pricePerDevice = calculatePricePerDevice(user.daysLeft());
+            int pricePerDevice = Math.toIntExact(offer.unitPrice());
 
             sendDeviceSelectionButtons(callbackQuery, telegramClient, pricePerDevice, availableDevices);
 
+        } catch (tg.configshop.telegram.SubscriptionSelectionException e) {
+            throw e;
+        } catch (IllegalStateException e) {
+            sendNoSubscriptionMessage(callbackQuery, telegramClient);
         } catch (Exception e) {
             e.printStackTrace();
-        }
-    }
-
-    private int calculatePricePerDevice(long daysLeft) {
-        try {
-            if (daysLeft < 30) {
-                return subscriptionService.getExtraPricePerDeviceByDays(30);
-            } else if (daysLeft < 90) {
-                return subscriptionService.getExtraPricePerDeviceByDays(90);
-            } else if (daysLeft < 180) {
-                return subscriptionService.getExtraPricePerDeviceByDays(180);
-            } else if (daysLeft < 360) {
-                return subscriptionService.getExtraPricePerDeviceByDays(360);
-            } else {
-                return 2 * subscriptionService.getExtraPricePerDeviceByDays(360);
-            }
-        } catch (SubscriptionNotFoundException e) {
-            e.printStackTrace();
-            throw new RuntimeException("Failed to calculate device price", e);
         }
     }
 
@@ -95,7 +69,7 @@ public class BuyMoreDevicesCallback implements Callback {
         int maxToShow = Math.min(availableDevices, 7);
 
         for (int i = 1; i <= maxToShow; i++) {
-            int totalPrice = i * pricePerDevice;
+            long totalPrice = tg.configshop.services.DevicePurchaseService.priceFor(pricePerDevice, i);
             String buttonText = String.format("+%d (%d ₽)", i, totalPrice);
 
             currentRow.add(InlineKeyboardButton.builder()

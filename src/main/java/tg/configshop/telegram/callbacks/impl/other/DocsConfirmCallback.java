@@ -7,7 +7,7 @@ import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 import tg.configshop.constants.CallbackName;
-import tg.configshop.services.RegistrationService;
+import tg.configshop.telegram.TelegramRegistrationService;
 import tg.configshop.telegram.callbacks.Callback;
 import tg.configshop.telegram.dto.BotMessageParams;
 import tg.configshop.telegram.message_body.StartCommandBody;
@@ -15,7 +15,7 @@ import tg.configshop.telegram.message_body.StartCommandBody;
 @Component
 @RequiredArgsConstructor
 public class DocsConfirmCallback implements Callback {
-    private final RegistrationService registrationService;
+    private final TelegramRegistrationService registrationService;
     private final StartCommandBody startCommandBody;
     @Override
     public CallbackName getCallback() {

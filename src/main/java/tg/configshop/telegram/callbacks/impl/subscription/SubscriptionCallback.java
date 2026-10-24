@@ -13,11 +13,11 @@ import tg.configshop.constants.ButtonText;
 import tg.configshop.constants.CallbackName;
 import tg.configshop.constants.MessageText;
 import tg.configshop.dto.RemnawaveUser;
-import tg.configshop.external_api.remnawave.dto.device.Device;
+import tg.configshop.dto.DeviceView;
 import tg.configshop.model.BotUser;
 import tg.configshop.services.DeviceService;
 import tg.configshop.services.ExternalSubscriptionService;
-import tg.configshop.services.UserService;
+import tg.configshop.telegram.TelegramUserService;
 import tg.configshop.telegram.callbacks.Callback;
 
 import java.util.List;
@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SubscriptionCallback implements Callback {
     private final CallbackName callbackName = CallbackName.SUBSCRIPTION;
-    private final UserService userService;
+    private final TelegramUserService userService;
     private final DeviceService deviceService;
     private final ExternalSubscriptionService externalSubscriptionService;
 
@@ -48,8 +48,8 @@ public class SubscriptionCallback implements Callback {
         Long userId = callbackQuery.getFrom().getId();
         BotUser botUser = userService.getUser(userId);
 
-        List<Device> devices = deviceService.getDevicesByUserId(userId);
-        RemnawaveUser remoteUser = externalSubscriptionService.getExternalUserWithCryptLinkAndSync(userId, json);
+        List<DeviceView> devices = deviceService.getDevices(userService.accountId(userId), userService.subscriptionId(userId));
+        RemnawaveUser remoteUser = externalSubscriptionService.getExternalUserWithCryptLinkAndSync(userService.accountId(userId), userService.subscriptionId(userId), json);
         int maxDevices = remoteUser.hwidDeviceLimit();
 
         double usedTrafficGb = remoteUser.userTraffic().usedTraffic();
@@ -66,7 +66,7 @@ public class SubscriptionCallback implements Callback {
         }
 
         String statusEmoji = remoteUser.isActive() ? "🟢" : "🔴";
-        String dateEnd = remoteUser.prettyDateExpireAt();
+        String dateEnd = tg.configshop.util.DateUtil.getDateEndSubscription(remoteUser.expireAt());
         long daysLeft = remoteUser.daysLeft();
         String temp = MessageText.SUBSCRIPTION.getMessageText();
         String text = temp.formatted(

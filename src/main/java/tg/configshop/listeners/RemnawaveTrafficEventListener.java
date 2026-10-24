@@ -11,9 +11,10 @@ import tg.configshop.services.ExternalTrafficService;
 @RequiredArgsConstructor
 public class RemnawaveTrafficEventListener {
     private final ExternalTrafficService externalTrafficService;
+    private final tg.configshop.services.SubscriptionAccessService subscriptions;
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleTrafficPaid(TrafficPaidEvent event) {
-        externalTrafficService.applyTrafficPurchase(event.user(), event.trafficGb());
+        externalTrafficService.applyTrafficPurchase(subscriptions.requireOwned(event.accountId(), event.subscriptionId()).remnawaveRef(), event.trafficGb());
     }
 }

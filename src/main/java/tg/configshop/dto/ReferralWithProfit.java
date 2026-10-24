@@ -1,11 +1,11 @@
 package tg.configshop.dto;
 
-import tg.configshop.model.BotUser;
+import java.util.UUID;
 
 import java.time.Instant;
 
 public record ReferralWithProfit (
-        BotUser botUser,
+        UUID accountId,
         Long profit,
         Instant referredAt
 ) {

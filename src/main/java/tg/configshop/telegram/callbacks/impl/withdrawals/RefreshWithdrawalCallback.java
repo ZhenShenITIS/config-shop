@@ -1,6 +1,7 @@
 package tg.configshop.telegram.callbacks.impl.withdrawals;
 
 import lombok.RequiredArgsConstructor;
+import tg.configshop.telegram.TelegramUserService;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
@@ -9,14 +10,15 @@ import org.telegram.telegrambots.meta.generics.TelegramClient;
 import tg.configshop.aop.AdminOnly;
 import tg.configshop.constants.CallbackName;
 import tg.configshop.constants.MessageText;
-import tg.configshop.model.Withdrawal;
+import tg.configshop.dto.WithdrawalDetails;
 import tg.configshop.services.WithdrawalService;
-import tg.configshop.listeners.WithdrawalCreatedListener;
+import tg.configshop.telegram.WithdrawalCreatedListener;
 import tg.configshop.telegram.callbacks.Callback;
 
 @Component
 @RequiredArgsConstructor
 public class RefreshWithdrawalCallback implements Callback {
+    private final TelegramUserService userService;
 
     private final WithdrawalService withdrawalService;
 
@@ -32,8 +34,8 @@ public class RefreshWithdrawalCallback implements Callback {
         String withdrawalId = parts[1];
 
         try {
-            Withdrawal wd = withdrawalService.getWithdrawal(withdrawalId);
-            String text = WithdrawalCreatedListener.formatAdminMessage(wd, withdrawalService.getRecipient(wd));
+            WithdrawalDetails wd = withdrawalService.getWithdrawal(withdrawalId);
+            String text = WithdrawalCreatedListener.formatAdminMessage(wd, userService.getRecipient(wd));
 
             try {
                 telegramClient.execute(EditMessageText.builder()

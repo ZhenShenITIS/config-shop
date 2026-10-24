@@ -1,6 +1,7 @@
 package tg.configshop.telegram.callbacks.impl.withdrawals;
 
 import lombok.RequiredArgsConstructor;
+import tg.configshop.telegram.TelegramUserService;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -10,14 +11,15 @@ import org.telegram.telegrambots.meta.generics.TelegramClient;
 import tg.configshop.aop.AdminOnly;
 import tg.configshop.constants.CallbackName;
 import tg.configshop.constants.MessageText;
-import tg.configshop.model.Withdrawal;
+import tg.configshop.dto.WithdrawalDetails;
 import tg.configshop.services.WithdrawalService;
-import tg.configshop.listeners.WithdrawalCreatedListener;
+import tg.configshop.telegram.WithdrawalCreatedListener;
 import tg.configshop.telegram.callbacks.Callback;
 
 @Component
 @RequiredArgsConstructor
 public class RejectWithdrawalCallback implements Callback {
+    private final TelegramUserService userService;
 
     private final WithdrawalService withdrawalService;
 
@@ -35,8 +37,8 @@ public class RejectWithdrawalCallback implements Callback {
         try {
             withdrawalService.rejectWithdrawal(withdrawalId);
 
-            Withdrawal wd = withdrawalService.getWithdrawal(withdrawalId);
-            String text = WithdrawalCreatedListener.formatAdminMessage(wd, withdrawalService.getRecipient(wd));
+            WithdrawalDetails wd = withdrawalService.getWithdrawal(withdrawalId);
+            String text = WithdrawalCreatedListener.formatAdminMessage(wd, userService.getRecipient(wd));
 
             telegramClient.execute(EditMessageText.builder()
                     .chatId(callbackQuery.getMessage().getChatId())
@@ -48,8 +50,8 @@ public class RejectWithdrawalCallback implements Callback {
 
             String userMsg = String.format(MessageText.USER_WITHDRAWAL_REJECTED.getMessageText(), wd.getPublicId());
 
-            telegramClient.execute(SendMessage.builder()
-                    .chatId(withdrawalService.getRecipient(wd).getId())
+            if (userService.getRecipient(wd) != null) telegramClient.execute(SendMessage.builder()
+                    .chatId(userService.getRecipient(wd).getId())
                     .text(userMsg)
                     .parseMode("HTML")
                     .build());

@@ -15,5 +15,5 @@ public interface TrafficPackageService {
 
     TrafficPackage getTrafficPackageByGb(int trafficGb) throws TrafficPackageNotFoundException;
 
-    void buyTraffic(Long userId, int trafficGb) throws InsufficientBalanceException, TrafficPackageNotFoundException;
+    void buyTraffic(java.util.UUID accountId, java.util.UUID subscriptionId, int trafficGb) throws InsufficientBalanceException, TrafficPackageNotFoundException;
 }

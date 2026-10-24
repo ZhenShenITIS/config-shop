@@ -9,13 +9,13 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 import tg.configshop.aop.AdminOnly;
 import tg.configshop.constants.CommandName;
-import tg.configshop.services.UserService;
+import tg.configshop.telegram.TelegramUserService;
 import tg.configshop.telegram.commands.Command;
 
 @RequiredArgsConstructor
 @Component
 public class TopUpCommand implements Command {
-    private final UserService userService;
+    private final TelegramUserService userService;
 
     @Override
     public CommandName getCommand() {

@@ -1,6 +1,5 @@
 package tg.configshop.services;
 
-import tg.configshop.repositories.BotUserRepository;
 import tg.configshop.repositories.AccountRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -8,9 +7,9 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tg.configshop.constants.WithdrawalStatus;
-import tg.configshop.dto.WithdrawalContext;
+import tg.configshop.dto.WithdrawalRequest;
+import tg.configshop.dto.WithdrawalDetails;
 import tg.configshop.events.WithdrawalCreatedEvent;
-import tg.configshop.model.BotUser;
 import tg.configshop.model.Withdrawal;
 import tg.configshop.repositories.WithdrawalRepository;
 
@@ -19,28 +18,27 @@ import tg.configshop.repositories.WithdrawalRepository;
 public class WithdrawalService {
 
     private final WithdrawalRepository withdrawalRepository;
-    private final UserService userService;
     private final BalanceService balanceService;
     private final ReferralService referralService;
     private final AccountRepository accounts;
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
-    private final BotUserRepository botUsers;
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
-    public Withdrawal createWithdrawal(long userId, WithdrawalContext context) {
-        BotUser user = userService.getUser(userId);
-        accounts.findByIdWithLock(user.getAccount().getId()).orElseThrow();
-        long amount = context.getAmount();
+    public WithdrawalDetails createWithdrawal(java.util.UUID accountId, WithdrawalRequest request) {
+        var account = accounts.findByIdWithLock(accountId).orElseThrow();
+        long amount = request.amount();
+        if (request.type() == null || request.requisites() == null || request.requisites().isBlank())
+            throw new IllegalArgumentException("Withdrawal type and requisites are required");
 
-        if (amount <= 0 || amount > referralService.getAvailableSumToWithdraw(userId)) {
+        if (amount < minimumAmount() || amount > referralService.getAvailableSumToWithdraw(accountId)) {
             throw new IllegalStateException("Недостаточно средств для вывода");
         }
         Withdrawal withdrawal = Withdrawal.builder()
-                .account(user.getAccount())
+                .account(account)
                 .amount(amount)
-                .type(context.getWithdrawalType())
-                .requisites(context.getRequisites())
+                .type(request.type())
+                .requisites(request.requisites())
                 .build();
 
         balanceService.withdrawal(withdrawal, false);
@@ -48,7 +46,7 @@ public class WithdrawalService {
 
         eventPublisher.publishEvent(new WithdrawalCreatedEvent(this, savedWithdrawal.getId()));
 
-        return savedWithdrawal;
+        return details(savedWithdrawal);
     }
 
     @Transactional
@@ -79,8 +77,14 @@ public class WithdrawalService {
         balanceService.withdrawal(withdrawal, true);
     }
 
-    public Withdrawal getWithdrawal(String id) {
-        return withdrawalRepository.findById(resolveId(id)).orElseThrow();
+    public long minimumAmount() { return 1000; }
+    @Transactional(readOnly = true)
+    public WithdrawalDetails getWithdrawal(String id) {
+        return details(withdrawalRepository.findById(resolveId(id)).orElseThrow());
+    }
+    private WithdrawalDetails details(Withdrawal value) {
+        return new WithdrawalDetails(value.getId(), value.getAccount().getId(), value.getAmount(), value.getType(),
+                value.getStatus(), value.getRequisites(), value.getCreatedAt());
     }
 
     private java.util.UUID resolveId(String value) {
@@ -88,9 +92,6 @@ public class WithdrawalService {
         catch (IllegalArgumentException e) {
             return jdbc.queryForObject("select new_id from migration_id_map where entity = 'withdrawals' and old_id = ?", java.util.UUID.class, value);
         }
-    }
-    public BotUser getRecipient(Withdrawal withdrawal) {
-        return botUsers.findFirstByAccount_IdOrderByTelegramIdAsc(withdrawal.getAccount().getId()).orElseThrow();
     }
     private Withdrawal getWithdrawalOrThrow(String id) {
         return withdrawalRepository.findByIdWithLock(resolveId(id))

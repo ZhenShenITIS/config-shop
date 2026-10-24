@@ -17,11 +17,9 @@ import tg.configshop.exceptions.promocode.PromoCodeNotFoundException;
 import tg.configshop.exceptions.promocode.ReferralPromoCodeAlreadyUsedException;
 import tg.configshop.exceptions.promocode.SelfReferralException;
 import tg.configshop.exceptions.promocode.TooManyReferralPromoException;
-import tg.configshop.model.BotUser;
 import tg.configshop.model.PromoCode;
 import tg.configshop.model.PromoCodeUse;
 import tg.configshop.model.TopUp;
-import tg.configshop.repositories.BotUserRepository;
 import tg.configshop.repositories.PromoCodeRepository;
 import tg.configshop.repositories.PromoCodeUseRepository;
 import tg.configshop.repositories.ReferralRepository;
@@ -36,7 +34,6 @@ import java.time.Instant;
 public class PromoCodeServiceImpl implements PromoCodeService {
     private final PromoCodeRepository promoCodeRepository;
     private final PromoCodeUseRepository promoCodeUseRepository;
-    private final BotUserRepository botUserRepository;
     private final ReferralService referralService;
     private final BalanceService balanceService;
     private final AccountRepository accountRepository;
@@ -47,12 +44,11 @@ public class PromoCodeServiceImpl implements PromoCodeService {
 
     @Override
     @Transactional
-    public void activatePromoCode(String code, Long userId) {
+    public void activatePromoCode(String code, java.util.UUID accountId) {
 
         PromoCode promoCode = getPromoCode(code.toUpperCase().trim());
 
-        BotUser user = getBotUser(userId);
-        accountRepository.findByIdWithLock(user.getAccount().getId()).orElseThrow();
+        Account user = accountRepository.findByIdWithLock(accountId).orElseThrow();
 
         checkReferralConditions(promoCode, user);
 
@@ -75,7 +71,7 @@ public class PromoCodeServiceImpl implements PromoCodeService {
 
     @Override
     @Transactional
-    public void createReferralPromoCode(String code, Long userId) throws TooManyReferralPromoException, PromoCodeAlreadyExistException, InvalidSymbolsPromoException {
+    public void createReferralPromoCode(String code, java.util.UUID accountId) throws TooManyReferralPromoException, PromoCodeAlreadyExistException, InvalidSymbolsPromoException {
         String upperCode = code.toUpperCase().trim();
 
         StringUtil.validateCodeFormat(upperCode);
@@ -84,14 +80,14 @@ public class PromoCodeServiceImpl implements PromoCodeService {
             throw new PromoCodeAlreadyExistException();
         }
 
-        if (promoCodeRepository.findCodesByReferrer(botUserRepository.getReferenceById(userId).getAccount()).size() >= 10) {
+        if (promoCodeRepository.findCodesByReferrer(accountRepository.findByIdWithLock(accountId).orElseThrow()).size() >= 10) {
             throw new TooManyReferralPromoException();
         }
 
         promoCodeRepository.save(PromoCode
                 .builder()
                         .isReferral(true)
-                        .referrer(botUserRepository.getReferenceById(userId).getAccount())
+                        .referrer(accountRepository.findByIdWithLock(accountId).orElseThrow())
                         .maxUses(MAX_USES_REFERRAL_CODE)
                         .amount(AMOUNT_REFERRAL_CODE)
                         .code(upperCode)
@@ -103,27 +99,20 @@ public class PromoCodeServiceImpl implements PromoCodeService {
                 .orElseThrow(() -> new PromoCodeNotFoundException());
     }
 
-    private BotUser getBotUser (Long userId) {
-        return botUserRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
-    }
-
-
-
-    private void checkReferralConditions(PromoCode promoCode, BotUser botUser) {
+    private void checkReferralConditions(PromoCode promoCode, Account account) {
         if (promoCode.getIsReferral()) {
             Account promoOwner = promoCode.getReferrer();
 
-            if (promoOwner != null && promoOwner.getId().equals(botUser.getAccount().getId())) {
+            if (promoOwner != null && promoOwner.getId().equals(account.getId())) {
                 throw new SelfReferralException();
             }
 
-            if (promoCodeUseRepository.existsByAccountAndPromoCode_IsReferralTrue(botUser.getAccount())) {
+            if (promoCodeUseRepository.existsByAccountAndPromoCode_IsReferralTrue(account)) {
                 throw new ReferralPromoCodeAlreadyUsedException();
             }
 
             if (promoOwner != null) {
-                boolean isCycle = referralRepository.isUserAncestorOf(botUser.getAccount().getId(), promoOwner.getId());
+                boolean isCycle = referralRepository.isAccountAncestorOf(account.getId(), promoOwner.getId());
                 if (isCycle) {
                     throw new CyclicReferralException();
                 }
@@ -131,22 +120,22 @@ public class PromoCodeServiceImpl implements PromoCodeService {
         }
     }
 
-    private void checkBasicConditions(PromoCode promoCode, BotUser user) {
+    private void checkBasicConditions(PromoCode promoCode, Account user) {
         if (promoCode.getMaxUses() != null && promoCode.getCurrentUses() >= promoCode.getMaxUses()) {
             throw new PromoCodeEndedException();
         }
-        if (promoCodeUseRepository.existsByPromoCodeAndAccount(promoCode, user.getAccount())) {
+        if (promoCodeUseRepository.existsByPromoCodeAndAccount(promoCode, user)) {
             throw new PromoCodeAlreadyUsedException();
         }
     }
 
-    private void setReferralIfPromoIsReferral (PromoCode promoCode, BotUser botUser) {
+    private void setReferralIfPromoIsReferral (PromoCode promoCode, Account account) {
         if (promoCode.getIsReferral() && promoCode.getReferrer() != null) {
-            referralService.createReferral(botUserRepository.findFirstByAccount_IdOrderByTelegramIdAsc(promoCode.getReferrer().getId()).orElseThrow().getId(), botUser.getId());
+            referralService.createReferral(promoCode.getReferrer().getId(), account.getId());
         }
     }
 
-    private void usePromoCode (PromoCode promoCode, BotUser user) {
+    private void usePromoCode (PromoCode promoCode, Account user) {
 
 
         createTopUp(promoCode, user);
@@ -157,9 +146,9 @@ public class PromoCodeServiceImpl implements PromoCodeService {
 
     }
 
-    private void createTopUp (PromoCode promoCode, BotUser user) {
+    private void createTopUp (PromoCode promoCode, Account user) {
         TopUp topUp = TopUp.builder()
-                .account(user.getAccount())
+                .account(user)
                 .value(promoCode.getAmount())
                 .topUpSource(TopUpSource.PROMO_CODE)
                 .promoCode(promoCode)
@@ -168,15 +157,15 @@ public class PromoCodeServiceImpl implements PromoCodeService {
         balanceService.credit(topUp);
     }
 
-    private void increaseUseCountOfPromoCode (PromoCode promoCode, BotUser user) {
+    private void increaseUseCountOfPromoCode (PromoCode promoCode, Account user) {
         promoCode.setCurrentUses(promoCode.getCurrentUses() + 1);
         promoCodeRepository.save(promoCode);
     }
 
-    private void createPromoCodeUsage (PromoCode promoCode, BotUser user) {
+    private void createPromoCodeUsage (PromoCode promoCode, Account user) {
         PromoCodeUse usage = PromoCodeUse.builder()
                 .promoCode(promoCode)
-                .account(user.getAccount())
+                .account(user)
                 .createdAt(Instant.now())
                 .build();
         promoCodeUseRepository.save(usage);

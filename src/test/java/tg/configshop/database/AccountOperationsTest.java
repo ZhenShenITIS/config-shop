@@ -32,7 +32,8 @@ import org.telegram.telegrambots.meta.api.objects.User;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 import tg.configshop.constants.*;
-import tg.configshop.dto.WithdrawalContext;
+import tg.configshop.dto.WithdrawalRequest;
+import tg.configshop.telegram.TelegramUserService;
 import tg.configshop.events.PaymentConfirmedEvent;
 import tg.configshop.external_api.pay.*;
 import tg.configshop.external_api.pay.constants.*;
@@ -71,6 +72,12 @@ class AccountOperationsTest {
         }
         context = new AnnotationConfigApplicationContext();
         context.registerBean(DataSource.class, () -> ds);
+        context.getEnvironment().getPropertySources().addFirst(new org.springframework.core.env.MapPropertySource("prices", Map.ofEntries(
+                Map.entry("MIN_DEVICE_COUNT", 1), Map.entry("MAX_DEVICE_COUNT", 10), Map.entry("TRAFFIC_LIMIT_PER_DEVICE", 10),
+                Map.entry("BASE_PRICE_FOR_1_MONTH", 100), Map.entry("BASE_PRICE_FOR_3_MONTH", 300), Map.entry("BASE_PRICE_FOR_6_MONTH", 600), Map.entry("BASE_PRICE_FOR_12_MONTH", 1200),
+                Map.entry("EXTRA_PER_DEVICE_1_MONTH", 10), Map.entry("EXTRA_PER_DEVICE_3_MONTH", 30), Map.entry("EXTRA_PER_DEVICE_6_MONTH", 60), Map.entry("EXTRA_PER_DEVICE_12_MONTH", 120),
+                Map.entry("TRAFFIC_PACKAGE_10_PRICE", 10), Map.entry("TRAFFIC_PACKAGE_30_PRICE", 30), Map.entry("TRAFFIC_PACKAGE_50_PRICE", 50),
+                Map.entry("TRAFFIC_PACKAGE_100_PRICE", 100), Map.entry("TRAFFIC_PACKAGE_250_PRICE", 250), Map.entry("TRAFFIC_PACKAGE_500_PRICE", 500))));
         context.register(Config.class);
         context.refresh();
         balance = bean(BalanceService.class);
@@ -88,22 +95,23 @@ class AccountOperationsTest {
     private void credit(BotUser user, long amount) {
         balance.credit(TopUp.builder().account(user.getAccount()).value(amount).topUpSource(TopUpSource.ADMIN).build());
     }
+    private UUID accountId(long telegramId) { return bean(BotUserRepository.class).findById(telegramId).orElseThrow().getAccount().getId(); }
     private Purchase purchase(BotUser user, long amount) {
         return Purchase.builder().account(user.getAccount()).remnawaveSubscription(user.getSubscription())
                 .paidAmount(amount).purchaseType(PurchaseType.DEVICE).deviceCount(1).build();
     }
     @Test void adminCorrectionsCanOverdrawAndRestoreBalance() {
-        var users = bean(UserService.class);
-        users.addToBalanceAsAdminTopUp(10L, 100L);
-        users.addToBalanceAsAdminTopUp(10L, -150L);
-        assertEquals(-50, users.getBalance(10L));
-        users.addToBalanceAsAdminTopUp(10L, -25L);
-        assertEquals(-75, users.getBalance(10L));
-        assertEquals(0L, bean(ReferralService.class).getAvailableSumToWithdraw(10L));
+        var users = balance;
+        users.adjustAsAdmin(accountId(10), 100L);
+        users.adjustAsAdmin(accountId(10), -150L);
+        assertEquals(-50, users.balance(accountId(10)));
+        users.adjustAsAdmin(accountId(10), -25L);
+        assertEquals(-75, users.balance(accountId(10)));
+        assertEquals(0L, bean(ReferralService.class).getAvailableSumToWithdraw(accountId(10)));
         assertThrows(tg.configshop.exceptions.subscription.InsufficientBalanceException.class,
                 () -> balance.purchase(purchase(buyer, 1)));
-        users.addToBalanceAsAdminTopUp(10L, 125L);
-        assertEquals(50, users.getBalance(10L));
+        users.adjustAsAdmin(accountId(10), 125L);
+        assertEquals(50, users.balance(accountId(10)));
         assertEquals(List.of(-150L, -25L, 100L, 125L), jdbc.queryForList(
                 "select amount from balance_log where type='ADMIN' order by amount", Long.class));
         assertEquals(4, bean(TopUpRepository.class).count());
@@ -156,8 +164,8 @@ class AccountOperationsTest {
         when(bean(PlategaClient.class).createPayment(any())).thenReturn(
             new CreatePaymentResponse("provider-id",PaymentMethod.SBP,"https://example.invalid/pay",
                 null,"1000.00 RUB",PaymentStatus.PENDING,null,null,null,null));
-        var p = bean(PaymentService.class).createPlategaPayment(1000L, 2, 10L);
-        var loaded = bean(PlategaPaymentRepository.class).findById(p.getId()).orElseThrow();
+        var p = bean(PaymentService.class).createPlategaPayment(1000L, 2, accountId(10), "https://example.invalid/return", "https://example.invalid/fail");
+        var loaded = bean(PlategaPaymentRepository.class).findById(p.id()).orElseThrow();
         assertEquals("provider-id", loaded.getTransactionId());
         assertEquals(buyer.getAccount().getId(), loaded.getAccount().getId());
         assertEquals(PaymentMethod.SBP, loaded.getPaymentMethod());
@@ -166,12 +174,12 @@ class AccountOperationsTest {
     @Test void paymentAndReferralRewardsAreAtomicAndNotRepeated() {
         var first = user(20); var second = user(30); var third = user(40);
         var referrals = bean(ReferralService.class);
-        referrals.createReferral(20L, 10L); referrals.createReferral(30L, 20L); referrals.createReferral(40L, 30L);
+        referrals.createReferral(accountId(20), accountId(10)); referrals.createReferral(accountId(30), accountId(20)); referrals.createReferral(accountId(40), accountId(30));
         var p = payment(buyer, "payment");
         when(bean(PlategaClient.class).updateStatus("payment")).thenReturn(PaymentStatus.CONFIRMED);
-        assertEquals(PaymentResult.CONFIRMED, bean(PaymentService.class).checkPayment("payment", 10L));
-        assertEquals(PaymentResult.EXPIRED, bean(PaymentService.class).checkPayment("payment", 10L));
-        context.publishEvent(new PaymentConfirmedEvent(this, 10L, 1000L, p.getId()));
+        assertEquals(PaymentResult.CONFIRMED, bean(PaymentService.class).checkPayment("payment", accountId(10)));
+        assertEquals(PaymentResult.EXPIRED, bean(PaymentService.class).checkPayment("payment", accountId(10)));
+        context.publishEvent(new PaymentConfirmedEvent(accountId(10), 1000L, p.getId()));
         assertEquals(1000, balance.balance(buyer.getAccount().getId()));
         assertEquals(350, balance.balance(first.getAccount().getId()));
         assertEquals(200, balance.balance(second.getAccount().getId()));
@@ -182,8 +190,8 @@ class AccountOperationsTest {
     @Test void paymentOwnershipAndUnmigratedPaymentAreHandledWithoutCredit() {
         var other = user(20);
         payment(other, "foreign");
-        assertThrows(IllegalArgumentException.class, () -> bean(PaymentService.class).checkPayment("foreign", 10L));
-        assertEquals(PaymentResult.MANUAL_REVIEW, bean(PaymentService.class).checkPayment("old-pending", 10L));
+        assertThrows(IllegalArgumentException.class, () -> bean(PaymentService.class).checkPayment("foreign", accountId(10)));
+        assertEquals(PaymentResult.MANUAL_REVIEW, bean(PaymentService.class).checkPayment("old-pending", accountId(10)));
         assertEquals(0, bean(BalanceLogRepository.class).count());
         verifyNoInteractions(bean(PlategaClient.class));
     }
@@ -191,7 +199,7 @@ class AccountOperationsTest {
         var p = payment(buyer, "old-credited");
         balance.credit(TopUp.builder().account(buyer.getAccount()).value(1000L)
                 .topUpSource(TopUpSource.EXTERNAL).platega(p).build());
-        assertEquals(PaymentResult.EXPIRED, bean(PaymentService.class).checkPayment("old-credited", 10L));
+        assertEquals(PaymentResult.EXPIRED, bean(PaymentService.class).checkPayment("old-credited", accountId(10)));
         assertEquals(1000, balance.balance(buyer.getAccount().getId()));
         assertEquals(1, bean(BalanceLogRepository.class).count());
         assertEquals(PaymentStatus.PENDING, bean(PlategaPaymentRepository.class).findById(p.getId()).orElseThrow().getStatus());
@@ -201,15 +209,15 @@ class AccountOperationsTest {
         var p = payment(buyer, "fractional"); p.setAmount(new BigDecimal("1000.50"));
         bean(PlategaPaymentRepository.class).saveAndFlush(p);
         when(bean(PlategaClient.class).updateStatus("fractional")).thenReturn(PaymentStatus.CONFIRMED);
-        assertThrows(ArithmeticException.class, () -> bean(PaymentService.class).checkPayment("fractional", 10L));
+        assertThrows(ArithmeticException.class, () -> bean(PaymentService.class).checkPayment("fractional", accountId(10)));
         assertEquals(PaymentStatus.PENDING, bean(PlategaPaymentRepository.class).findById(p.getId()).orElseThrow().getStatus());
         assertEquals(0, bean(BalanceLogRepository.class).count());
     }
     @Test void promoCodeUseAndBalanceAreCommittedTogetherOnce() {
         bean(PromoCodeRepository.class).saveAndFlush(PromoCode.builder().code("PROMO").amount(100L).maxUses(2).build());
         var promo = bean(PromoCodeService.class);
-        promo.activatePromoCode("promo", 10L);
-        assertThrows(PromoCodeAlreadyUsedException.class, () -> promo.activatePromoCode("PROMO", 10L));
+        promo.activatePromoCode("promo", accountId(10));
+        assertThrows(PromoCodeAlreadyUsedException.class, () -> promo.activatePromoCode("PROMO", accountId(10)));
         assertEquals(100, balance.balance(buyer.getAccount().getId()));
         assertEquals(1, bean(PromoCodeUseRepository.class).count());
         assertEquals(1, bean(PromoCodeRepository.class).findByCode("PROMO").orElseThrow().getCurrentUses());
@@ -222,7 +230,7 @@ class AccountOperationsTest {
             var tasks = new ArrayList<Future<Boolean>>();
             for (long id : new long[]{10,20}) tasks.add(pool.submit(() -> {
                 start.await();
-                try { bean(PromoCodeService.class).activatePromoCode("LAST", id); return true; }
+                try { bean(PromoCodeService.class).activatePromoCode("LAST", accountId(id)); return true; }
                 catch (PromoCodeEndedException e) { return false; }
             }));
             start.countDown();
@@ -233,27 +241,27 @@ class AccountOperationsTest {
     }
     @Test void withdrawalRefundIsOnceAndLegacyButtonResolvesUuid() {
         var source = user(20);
-        balance.credit(TopUp.builder().account(buyer.getAccount()).value(200L).topUpSource(TopUpSource.REFERRAL).referral(source.getAccount()).build());
-        var input = new WithdrawalContext(); input.setAmount(100); input.setRequisites("test"); input.setWithdrawalType(WithdrawalType.CARD);
+        balance.credit(TopUp.builder().account(buyer.getAccount()).value(2000L).topUpSource(TopUpSource.REFERRAL).referral(source.getAccount()).build());
+        var input = new WithdrawalRequest(WithdrawalType.CARD, 1000, "test");
         var service = bean(WithdrawalService.class);
-        var w = service.createWithdrawal(10, input);
+        var w = service.createWithdrawal(accountId(10), input);
         jdbc.update("insert into migration_id_map(entity,old_id,new_id) values ('withdrawals','123',?)", w.getId());
         assertEquals(w.getId(), service.getWithdrawal("123").getId());
         service.rejectWithdrawal("123");
         assertThrows(IllegalStateException.class, () -> service.rejectWithdrawal(w.getId().toString()));
         assertThrows(IllegalStateException.class, () -> service.approveWithdrawal("123"));
-        assertEquals(200, balance.balance(buyer.getAccount().getId()));
+        assertEquals(2000, balance.balance(buyer.getAccount().getId()));
         assertEquals(3, bean(BalanceLogRepository.class).count());
     }
     @Test void historyAndReferralProjectionUseNewSchemaWithoutPanelCalls() {
         var referrer = user(20);
-        bean(ReferralService.class).createReferral(20L, 10L);
+        bean(ReferralService.class).createReferral(accountId(20), accountId(10));
         credit(buyer, 100);
         balance.purchase(purchase(buyer,30));
-        var page = bean(OperationsService.class).getOperationsByUserId(10,0);
+        var page = bean(OperationsService.class).getOperations(accountId(10),0,10);
         assertEquals(2, page.getTotalElements());
         assertEquals(PurchaseType.DEVICE, page.getContent().getFirst().getPurchaseType());
-        assertEquals(1, bean(ReferralService.class).getReferralsWithProfitAndLevel(20L,0).getTotalElements());
+        assertEquals(1, bean(ReferralService.class).getReferralsWithProfitAndLevel(accountId(20),0,15).getTotalElements());
         verifyNoInteractions(bean(PlategaClient.class));
     }
 
@@ -263,7 +271,7 @@ class AccountOperationsTest {
             bean(PromoCodeRepository.class).saveAndFlush(PromoCode.builder().code("REF_TEST_" + i)
                     .amount(100L).isReferral(true).referrer(buyer.getAccount()).build());
         }
-        var callback = new ReferralCallback(bean(ReferralService.class), bean(UserService.class));
+        var callback = new ReferralCallback(bean(ReferralService.class), new TelegramUserService(bean(BotUserRepository.class), balance, bean(SubscriptionAccessService.class)));
         ReflectionTestUtils.setField(callback, "botUsername", "test_bot");
         var message = mock(Message.class);
         when(message.getChatId()).thenReturn(10L);
@@ -293,19 +301,144 @@ class AccountOperationsTest {
     @Test void referralCodesCanBeCreatedWithoutCallerTransaction() {
         assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
         var referrals = bean(ReferralService.class);
-        referrals.createReferralCode(10L);
-        referrals.createReferralCode(10L);
-        bean(PromoCodeService.class).createReferralPromoCode("CUSTOM_REF", 10L);
-        assertEquals(Set.of("REF_10", "CUSTOM_REF"), new HashSet<>(referrals.getReferralPromoCodes(10L)));
+        referrals.createReferralCode(accountId(10), "REF_10");
+        referrals.createReferralCode(accountId(10), "REF_10");
+        bean(PromoCodeService.class).createReferralPromoCode("CUSTOM_REF", accountId(10));
+        assertEquals(Set.of("REF_10", "CUSTOM_REF"), new HashSet<>(referrals.getReferralPromoCodes(accountId(10))));
         assertEquals(2, bean(PromoCodeRepository.class).count());
         assertEquals(buyer.getAccount().getId(), bean(PromoCodeRepository.class)
                 .findByCode("REF_10").orElseThrow().getReferrer().getId());
     }
 
+
+    @Test void accountWithoutChannelCanReadBalanceHistoryAndEmptySubscriptions() {
+        UUID id = bean(AccountService.class).createAccount();
+        assertEquals(0, bean(AccountService.class).getAccount(id).balance());
+        assertTrue(bean(SubscriptionAccessService.class).list(id).isEmpty());
+        balance.adjustAsAdmin(id, 150);
+        assertEquals(150, bean(AccountService.class).getAccount(id).balance());
+        assertEquals(1, bean(OperationsService.class).getOperations(id, 0, 20).getTotalElements());
+        assertTrue(bean(BotUserRepository.class).findFirstByAccount_IdOrderByTelegramIdAsc(id).isEmpty());
+        assertEquals(0, context.getBeanNamesForType(TelegramClient.class).length);
+        verifyNoInteractions(bean(tg.configshop.external_api.remnawave.RemnawaveClient.class));
+    }
+
+    @Test void accountOnlyPaymentRewardsMixedChainAndProjectionDoesNotDuplicateProfiles() {
+        var accounts = bean(AccountService.class);
+        UUID payer = accounts.createAccount(), first = accounts.createAccount(), third = accounts.createAccount();
+        UUID second = buyer.getAccount().getId();
+        var referrals = bean(ReferralService.class);
+        referrals.createReferral(first, payer); referrals.createReferral(second, first); referrals.createReferral(third, second);
+        var payment = bean(PlategaPaymentRepository.class).saveAndFlush(PlategaPayment.builder()
+                .account(accounts.requireAccount(payer)).transactionId("web-payment").amount(new BigDecimal("1000"))
+                .currency("RUB").paymentMethod(PaymentMethod.SBP).status(PaymentStatus.PENDING).build());
+        when(bean(PlategaClient.class).updateStatus("web-payment")).thenReturn(PaymentStatus.CONFIRMED);
+        assertEquals(PaymentResult.CONFIRMED, bean(PaymentService.class).checkPayment("web-payment", payer));
+        context.publishEvent(new PaymentConfirmedEvent(payer, 1000, payment.getId()));
+        assertEquals(1000, balance.balance(payer)); assertEquals(350, balance.balance(first));
+        assertEquals(200, balance.balance(second)); assertEquals(100, balance.balance(third));
+        for (long id : new long[]{101,102}) bean(BotUserRepository.class).saveAndFlush(BotUser.builder()
+                .telegramId(id).name("Profile").account(accounts.requireAccount(payer)).build());
+        var page = referrals.getReferralsWithProfitAndLevel(first,0,15);
+        assertEquals(1,page.getTotalElements()); assertEquals(payer,page.getContent().getFirst().accountId());
+        assertEquals(350,page.getContent().getFirst().profit());
+    }
+
+    @Test void accountOnlyReferralPromoAndWithdrawalNeedNoProfile() {
+        UUID owner = bean(AccountService.class).createAccount(), member = bean(AccountService.class).createAccount();
+        bean(PromoCodeService.class).createReferralPromoCode("WEB_REF",owner);
+        bean(PromoCodeService.class).activatePromoCode("WEB_REF",member);
+        assertEquals(owner,bean(ReferralService.class).getReferrerId(member).orElseThrow());
+        assertEquals(100,balance.balance(member));
+        balance.credit(TopUp.builder().account(bean(AccountService.class).requireAccount(owner)).value(2000L)
+                .topUpSource(TopUpSource.REFERRAL).referral(bean(AccountService.class).requireAccount(member)).build());
+        var withdrawal = bean(WithdrawalService.class);
+        assertThrows(IllegalStateException.class, () -> withdrawal.createWithdrawal(owner,new WithdrawalRequest(WithdrawalType.CARD,999,"test")));
+        var created=withdrawal.createWithdrawal(owner,new WithdrawalRequest(WithdrawalType.CARD,1000,"test"));
+        assertEquals(owner,created.accountId()); assertEquals(1000,balance.balance(owner));
+        withdrawal.rejectWithdrawal(created.id().toString());
+        assertEquals(2000,balance.balance(owner));
+    }
+
+    @Test void paymentConstraintsAreEnforcedBeforeProviderCall() {
+        UUID id=bean(AccountService.class).createAccount(); var payments=bean(PaymentService.class);
+        for(long amount:new long[]{0,99,10001}) assertThrows(IllegalArgumentException.class,
+                () -> payments.createPlategaPayment(amount,2,id,"https://example.invalid/ok","https://example.invalid/fail"));
+        assertThrows(IllegalArgumentException.class, () -> payments.createPlategaPayment(100L,999,id,"https://example.invalid/ok","https://example.invalid/fail"));
+        assertThrows(IllegalArgumentException.class, () -> payments.createPlategaPayment(100L,2,UUID.randomUUID(),"https://example.invalid/ok","https://example.invalid/fail"));
+        verifyNoInteractions(bean(PlategaClient.class));
+        assertEquals(0,bean(PlategaPaymentRepository.class).count());
+    }
+
+    @Test void purchaseChangesOnlySelectedSubscriptionWithoutChannel() {
+        UUID id=bean(AccountService.class).createAccount(); var account=bean(AccountService.class).requireAccount(id);
+        var first=bean(RemnawaveSubscriptionRepository.class).saveAndFlush(RemnawaveSubscription.builder().account(account).remnawaveId(501L).build());
+        var second=bean(RemnawaveSubscriptionRepository.class).saveAndFlush(RemnawaveSubscription.builder().account(account).remnawaveId(502L).build());
+        balance.adjustAsAdmin(id,1000);
+        var client=bean(tg.configshop.external_api.remnawave.RemnawaveClient.class);
+        var expiry=java.time.Instant.now().plusSeconds(86400);
+        when(client.getUser(second.remnawaveRef())).thenReturn(tg.configshop.external_api.remnawave.dto.user.RemnawaveUserResponse.builder()
+                .id(502L).expireAt(expiry).hwidDeviceLimit(1).build());
+        bean(SubscriptionService.class).buySubscription(id,second.getId(),30,2);
+        assertEquals(890,balance.balance(id));
+        var purchase=bean(PurchaseRepository.class).findAll().getFirst();
+        assertEquals(second.getId(),purchase.getRemnawaveSubscription().getId());
+        verify(client).updateSubscription(second.remnawaveRef(),expiry.plusSeconds(30L*86400),2);
+        verify(client,never()).getUser(first.remnawaveRef());
+        assertEquals(2,bean(SubscriptionAccessService.class).list(id).size());
+    }
+
+    @Test void everySubscriptionEntryPointRejectsForeignOwnerBeforeSideEffects() {
+        UUID id=bean(AccountService.class).createAccount(), foreign=buyer.getSubscription().getId();
+        List<Runnable> attempts=List.of(
+                () -> bean(SubscriptionService.class).buySubscription(id,foreign,30,1),
+                () -> bean(TrafficPackageService.class).buyTraffic(id,foreign,10),
+                () -> bean(DevicePurchaseService.class).purchaseDevices(id,foreign,1),
+                () -> bean(DevicePurchaseService.class).preview(id,foreign,1),
+                () -> bean(DeviceService.class).getDevices(id,foreign),
+                () -> bean(DeviceService.class).deleteDeviceById(id,foreign,"device"),
+                () -> bean(ExternalSubscriptionService.class).getExternalUser(id,foreign));
+        for(var attempt:attempts) assertThrows(IllegalArgumentException.class,attempt::run);
+        verifyNoInteractions(bean(tg.configshop.external_api.remnawave.RemnawaveClient.class));
+        assertEquals(0,bean(PurchaseRepository.class).count()); assertEquals(0,bean(BalanceLogRepository.class).count());
+    }
+
+    @Test void trialCreationWithoutChannelIsIdempotentAndPreservesOtherAccounts() {
+        UUID id=bean(AccountService.class).createAccount(); String key="a_"+id.toString().replace("-","");
+        var client=bean(tg.configshop.external_api.remnawave.RemnawaveClient.class);
+        when(client.createBasicUser(key)).thenReturn(tg.configshop.external_api.remnawave.dto.user.RemnawaveUserResponse.builder()
+                .id(601L).shortUuid("short-web").expireAt(java.time.Instant.now().plusSeconds(86400)).build());
+        var initial=bean(RegistrationService.class).createTrialSubscription(id);
+        assertEquals(initial,bean(RegistrationService.class).createTrialSubscription(id));
+        assertEquals(id,initial.accountId()); verify(client,times(1)).createBasicUser(key);
+        verify(bean(tg.configshop.quartz.services.SchedulerService.class)).scheduleTrialTrafficChecks(id,initial.id());
+        assertTrue(bean(BotUserRepository.class).findFirstByAccount_IdOrderByTelegramIdAsc(id).isEmpty());
+        assertEquals(1,bean(SubscriptionAccessService.class).list(buyer.getAccount().getId()).size());
+    }
+
+    @Test void referralFailureRollsBackPaymentAndEveryLedgerEntry() {
+        UUID payer=bean(AccountService.class).createAccount(), referrer=bean(AccountService.class).createAccount();
+        bean(ReferralService.class).createReferral(referrer,payer);
+        var payment=bean(PlategaPaymentRepository.class).saveAndFlush(PlategaPayment.builder()
+                .account(bean(AccountService.class).requireAccount(payer)).transactionId("rollback-payment")
+                .amount(new BigDecimal("1000")).currency("RUB").paymentMethod(PaymentMethod.SBP).status(PaymentStatus.PENDING).build());
+        when(bean(PlategaClient.class).updateStatus("rollback-payment")).thenReturn(PaymentStatus.CONFIRMED);
+        context.addApplicationListener(event -> {
+            if(event instanceof org.springframework.context.PayloadApplicationEvent<?> payload
+                    && payload.getPayload() instanceof tg.configshop.events.ReferralRewardEvent) throw new IllegalStateException("test failure");
+        });
+        assertThrows(IllegalStateException.class, () -> bean(PaymentService.class).checkPayment("rollback-payment",payer));
+        assertEquals(PaymentStatus.PENDING,bean(PlategaPaymentRepository.class).findById(payment.getId()).orElseThrow().getStatus());
+        assertEquals(0,balance.balance(payer)); assertEquals(0,balance.balance(referrer));
+        assertEquals(0,bean(TopUpRepository.class).count()); assertEquals(0,bean(BalanceLogRepository.class).count());
+    }
+
     @org.springframework.boot.test.context.TestConfiguration @EnableTransactionManagement
     @EnableJpaRepositories(basePackages = {"tg.configshop.repositories", "tg.configshop.external_api.pay.repositories"})
-    @Import({BalanceServiceImpl.class, UserServiceImpl.class, ReferralServiceImpl.class, PromoCodeServiceImpl.class,
-            WithdrawalService.class, PaymentServiceImpl.class, PaymentConfirmedListener.class, OperationsService.class})
+    @Import({BalanceServiceImpl.class, AccountService.class, SubscriptionAccessService.class, ReferralServiceImpl.class, PromoCodeServiceImpl.class,
+            WithdrawalService.class, PaymentServiceImpl.class, PaymentConfirmedListener.class, OperationsService.class,
+            SubscriptionServiceImpl.class, TrafficPackageServiceImpl.class, DeviceService.class, DevicePurchaseService.class,
+            ExternalSubscriptionService.class, RegistrationServiceImpl.class, tg.configshop.listeners.RemnawaveEventListener.class})
     static class Config {
         @Bean LocalContainerEntityManagerFactoryBean entityManagerFactory(DataSource ds) {
             var factory = new LocalContainerEntityManagerFactoryBean(); factory.setDataSource(ds);
@@ -316,6 +449,9 @@ class AccountOperationsTest {
         }
         @Bean JpaTransactionManager transactionManager(EntityManagerFactory emf) { return new JpaTransactionManager(emf); }
         @Bean JdbcTemplate jdbcTemplate(DataSource ds) { return new JdbcTemplate(ds); }
+        @Bean tg.configshop.external_api.remnawave.RemnawaveClient remnawaveClient() { return mock(tg.configshop.external_api.remnawave.RemnawaveClient.class); }
+        @Bean tg.configshop.external_api.remnawave.config.RemnawaveApiVersion apiVersion() { return new tg.configshop.external_api.remnawave.config.RemnawaveApiVersion(3); }
+        @Bean tg.configshop.quartz.services.SchedulerService scheduler() { return mock(tg.configshop.quartz.services.SchedulerService.class); }
         @Bean PlategaClient plategaClient() { return mock(PlategaClient.class); }
     }
 }

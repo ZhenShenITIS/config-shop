@@ -1,6 +1,7 @@
 package tg.configshop.telegram.callbacks.impl.payment;
 
 import lombok.RequiredArgsConstructor;
+import tg.configshop.telegram.TelegramUserService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
@@ -24,6 +25,7 @@ import tg.configshop.telegram.callbacks.Callback;
 @Component
 @RequiredArgsConstructor
 public class CheckStatusPaymentCallback implements Callback {
+    private final TelegramUserService userService;
     public static final String PAYLOAD_SEPARATOR = ":";
     private final PaymentService paymentService;
     private final UserStateRepository stateRepository;
@@ -60,7 +62,7 @@ public class CheckStatusPaymentCallback implements Callback {
 
         String transactionId = parts[1];
 
-        PaymentResult paymentResult = paymentService.checkPayment(transactionId, userId);
+        PaymentResult paymentResult = paymentService.checkPayment(transactionId, userService.accountId(userId));
         log.info("Send request to payment service. Result: {}, userId: {}", paymentResult, userId);
 
         switch (paymentResult) {

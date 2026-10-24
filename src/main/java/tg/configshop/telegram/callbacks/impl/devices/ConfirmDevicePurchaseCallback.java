@@ -18,7 +18,7 @@ import tg.configshop.exceptions.subscription.InsufficientBalanceException;
 import tg.configshop.model.BotUser;
 import tg.configshop.services.DevicePurchaseService;
 import tg.configshop.services.SubscriptionService;
-import tg.configshop.services.UserService;
+import tg.configshop.telegram.TelegramUserService;
 import tg.configshop.telegram.callbacks.Callback;
 
 @Component
@@ -28,7 +28,7 @@ public class ConfirmDevicePurchaseCallback implements Callback {
 
     private final DevicePurchaseService devicePurchaseService;
     private final SubscriptionService subscriptionService;
-    private final UserService userService;
+    private final TelegramUserService userService;
 
     @Value("${SUPPORT_USERNAME}")
     private String supportUsername;
@@ -61,10 +61,11 @@ public class ConfirmDevicePurchaseCallback implements Callback {
             return;
         }
 
-        long totalPrice = (long) deviceCount * pricePerDevice;
+        long totalPrice = 0;
 
         try {
-            totalPrice = devicePurchaseService.purchaseDevices(userId, deviceCount);
+            totalPrice = devicePurchaseService.preview(userService.accountId(userId), userService.subscriptionId(userId), deviceCount).totalPrice();
+            totalPrice = devicePurchaseService.purchaseDevices(userService.accountId(userId), userService.subscriptionId(userId), deviceCount);
             sendSuccessMessage(telegramClient, chatId, messageId, deviceCount, (int) totalPrice);
 
         } catch (InsufficientBalanceException e) {
@@ -74,6 +75,8 @@ public class ConfirmDevicePurchaseCallback implements Callback {
                     deviceCount, (int) totalPrice, (int) userService.getBalance(user.getId()));
         } catch (TooManyDevicesException e) {
             sendTooManyDevicesMessage(telegramClient, chatId, messageId);
+        } catch (tg.configshop.telegram.SubscriptionSelectionException e) {
+            throw e;
         } catch (Exception e) {
             e.printStackTrace();
             sendUnknownError(telegramClient, chatId, messageId);

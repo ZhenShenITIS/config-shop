@@ -4,11 +4,9 @@ import tg.configshop.services.BalanceService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import tg.configshop.constants.MessageText;
 import tg.configshop.constants.PaymentResult;
 import tg.configshop.constants.TopUpSource;
 import tg.configshop.events.PaymentConfirmedEvent;
@@ -22,7 +20,9 @@ import tg.configshop.external_api.pay.repositories.PlategaPaymentRepository;
 import tg.configshop.model.TopUp;
 import tg.configshop.repositories.TopUpRepository;
 import tg.configshop.services.PaymentService;
-import tg.configshop.services.UserService;
+import tg.configshop.services.AccountService;
+import tg.configshop.dto.PaymentView;
+import tg.configshop.dto.PaymentLimits;
 
 @Slf4j
 @Service
@@ -30,23 +30,30 @@ import tg.configshop.services.UserService;
 public class PaymentServiceImpl implements PaymentService {
     private final PlategaClient plategaClient;
     private final PlategaPaymentRepository paymentRepository;
-    private final UserService userService;
+    private final AccountService accounts;
     private final BalanceService balanceService;
     private final TopUpRepository topUpRepository;
     private final ApplicationEventPublisher applicationEventPublisher;
 
-    @Value("${TELEGRAM_BOT_USERNAME}")
-    private String telegramBotUsername;
+    @Override public PaymentLimits limits() { return new PaymentLimits(100, 10000); }
 
     @Override
-    public PlategaPayment createPlategaPayment(Long amount, int paymentMethodInt, Long userId) {
-        if (amount == null || amount <= 0) throw new IllegalArgumentException("Non-positive payment");
+    public PaymentView createPlategaPayment(Long amount, int paymentMethodInt, java.util.UUID accountId, String returnUrl, String failedUrl) {
+        if (amount == null || amount < limits().minimum() || amount > limits().maximum())
+            throw new IllegalArgumentException("Payment amount is outside allowed range");
+        tg.configshop.external_api.pay.constants.PaymentMethod.fromIntMethod(paymentMethodInt);
+        var account = accounts.requireAccount(accountId);
+        for (String url : new String[]{returnUrl, failedUrl}) {
+            var uri = java.net.URI.create(url);
+            if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null)
+                throw new IllegalArgumentException("Payment return URL must be an absolute HTTPS URL");
+        }
         CreatePaymentRequest createPaymentRequest = new CreatePaymentRequest(
                 paymentMethodInt,
                 new PaymentDetails(amount.doubleValue(), "RUB"),
-                MessageText.PAYMENT_DESCRIPTION.getMessageText().formatted(userId),
-                "https://t.me/" + telegramBotUsername,
-                "https://t.me/" + telegramBotUsername,
+                "Пополнение баланса аккаунта " + accountId,
+                returnUrl,
+                failedUrl,
                 "...");
         CreatePaymentResponse createPaymentResponse = plategaClient.createPayment(createPaymentRequest);
         String[] details = createPaymentResponse.paymentDetails().trim().split("\\s+");
@@ -62,19 +69,19 @@ public class PaymentServiceImpl implements PaymentService {
                 .paymentMethod(createPaymentResponse.paymentMethod())
                 .redirect(createPaymentResponse.redirect())
                 .transactionId(createPaymentResponse.transactionId())
-                .account(userService.getUser(userId).getAccount())
+                .account(account)
                 .build();
         paymentRepository.save(plategaPayment);
-        return plategaPayment;
+        return new PaymentView(plategaPayment.getId(), plategaPayment.getTransactionId(), amount, plategaPayment.getStatus(), plategaPayment.getRedirect());
     }
 
     @Override
     @Transactional
-    public PaymentResult checkPayment(String paymentId, Long userId) {
+    public PaymentResult checkPayment(String paymentId, java.util.UUID accountId) {
         PlategaPayment payment = paymentRepository.findByIdWithLock(paymentId)
                 .orElse(null);
         if (payment == null) return PaymentResult.MANUAL_REVIEW;
-        if (!payment.getAccount().getId().equals(userService.getUser(userId).getAccount().getId())) {
+        if (!payment.getAccount().getId().equals(accountId)) {
             throw new IllegalArgumentException("Payment belongs to another account");
         }
 
@@ -103,7 +110,7 @@ public class PaymentServiceImpl implements PaymentService {
                 Long amount = payment.getAmount().longValueExact();
 
                 saveTopUpHistory(amount, payment);
-                applicationEventPublisher.publishEvent(new PaymentConfirmedEvent(this, userId, amount, payment.getId()));
+                applicationEventPublisher.publishEvent(new PaymentConfirmedEvent(accountId, amount, payment.getId()));
 
                 return PaymentResult.CONFIRMED;
             } else if (remoteStatus == PaymentStatus.CANCELED) {

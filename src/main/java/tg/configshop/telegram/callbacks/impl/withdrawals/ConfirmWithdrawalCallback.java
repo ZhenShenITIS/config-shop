@@ -1,6 +1,7 @@
 package tg.configshop.telegram.callbacks.impl.withdrawals;
 
 import lombok.RequiredArgsConstructor;
+import tg.configshop.telegram.TelegramUserService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -12,7 +13,7 @@ import tg.configshop.constants.CallbackName;
 import tg.configshop.constants.DialogStageName;
 import tg.configshop.constants.MessageText;
 import tg.configshop.dto.WithdrawalContext;
-import tg.configshop.model.Withdrawal;
+import tg.configshop.dto.WithdrawalDetails;
 import tg.configshop.repositories.UserStateRepository;
 import tg.configshop.services.WithdrawalService;
 import tg.configshop.telegram.callbacks.Callback;
@@ -23,6 +24,7 @@ import tg.configshop.telegram.message_body.StartCommandBody;
 @Component
 @RequiredArgsConstructor
 public class ConfirmWithdrawalCallback implements Callback {
+    private final TelegramUserService userService;
 
     private final UserStateRepository userStateRepository;
     private final WithdrawalService withdrawalService;
@@ -48,7 +50,7 @@ public class ConfirmWithdrawalCallback implements Callback {
         }
 
         try {
-            Withdrawal withdrawal = withdrawalService.createWithdrawal(userId, context);
+            WithdrawalDetails withdrawal = withdrawalService.createWithdrawal(userService.accountId(userId), new tg.configshop.dto.WithdrawalRequest(context.getWithdrawalType(), context.getAmount(), context.getRequisites()));
 
             telegramClient.execute(DeleteMessage.builder()
                     .chatId(chatId)

@@ -1,6 +1,7 @@
 package tg.configshop.telegram.callbacks.impl.withdrawals;
 
 import lombok.RequiredArgsConstructor;
+import tg.configshop.telegram.TelegramUserService;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
@@ -23,6 +24,7 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 public class CryptoWithdrawalCallback implements Callback {
+    private final TelegramUserService userService;
     private final ReferralService referralService;
     private final UserStateRepository userStateRepository;
 
@@ -37,7 +39,7 @@ public class CryptoWithdrawalCallback implements Callback {
         int messageId = callbackQuery.getMessage().getMessageId();
         long userId = callbackQuery.getFrom().getId();
 
-        long availableBalance = referralService.getAvailableSumToWithdraw(userId);
+        long availableBalance = referralService.getAvailableSumToWithdraw(userService.accountId(userId));
 
         List<InlineKeyboardRow> keyboard = new ArrayList<>();
 

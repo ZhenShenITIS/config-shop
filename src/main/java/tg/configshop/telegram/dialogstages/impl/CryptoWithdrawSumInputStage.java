@@ -1,6 +1,7 @@
 package tg.configshop.telegram.dialogstages.impl;
 
 import lombok.RequiredArgsConstructor;
+import tg.configshop.telegram.TelegramUserService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
@@ -29,12 +30,13 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 public class CryptoWithdrawSumInputStage implements DialogStage {
+    private final TelegramUserService userService;
 
     private final UserStateRepository userStateRepository;
     private final ReferralService referralService;
     private final WithdrawalCallback withdrawalCallback;
 
-    private static final long MIN_WITHDRAWAL_SUM = 1000L;
+    private final tg.configshop.services.WithdrawalService withdrawalService;
 
     @Override
     public DialogStageName getDialogStage() {
@@ -72,10 +74,10 @@ public class CryptoWithdrawSumInputStage implements DialogStage {
 
         try {
             amountToWithdraw = Long.parseLong(text);
-            long availableBalance = referralService.getAvailableSumToWithdraw(userId);
+            long availableBalance = referralService.getAvailableSumToWithdraw(userService.accountId(userId));
 
-            if (amountToWithdraw < MIN_WITHDRAWAL_SUM) {
-                responseText = String.format(MessageText.WITHDRAWAL_SUM_TOO_SMALL.getMessageText(), MIN_WITHDRAWAL_SUM);
+            if (amountToWithdraw < withdrawalService.minimumAmount()) {
+                responseText = String.format(MessageText.WITHDRAWAL_SUM_TOO_SMALL.getMessageText(), withdrawalService.minimumAmount());
             } else if (amountToWithdraw > availableBalance) {
                 responseText = String.format(MessageText.WITHDRAWAL_INSUFFICIENT_FUNDS.getMessageText(), availableBalance, amountToWithdraw);
             } else {

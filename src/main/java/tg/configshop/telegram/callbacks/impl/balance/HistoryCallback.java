@@ -19,7 +19,7 @@ import tg.configshop.constants.OperationType;
 import tg.configshop.dto.OperationView;
 import tg.configshop.model.BotUser;
 import tg.configshop.services.OperationsService;
-import tg.configshop.services.UserService;
+import tg.configshop.telegram.TelegramUserService;
 import tg.configshop.telegram.callbacks.Callback;
 import tg.configshop.util.DateUtil;
 
@@ -30,7 +30,7 @@ import java.util.List;
 @Component
 public class HistoryCallback implements Callback {
     private final OperationsService operationsService;
-    private final UserService userService;
+    private final TelegramUserService userService;
 
     private static final String PAYLOAD_SEPARATOR = ":";
 
@@ -54,7 +54,7 @@ public class HistoryCallback implements Callback {
             }
         }
 
-        Page<OperationView> page = operationsService.getOperationsByUserId(userId, pageNumber);
+        Page<OperationView> page = operationsService.getOperations(userService.accountId(userId), pageNumber, 10);
 
         String text;
         List<InlineKeyboardRow> rows = new ArrayList<>();

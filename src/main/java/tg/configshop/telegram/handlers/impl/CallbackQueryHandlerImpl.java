@@ -21,6 +21,16 @@ public class CallbackQueryHandlerImpl implements CallbackQueryHandler {
 
     @Override
     public void processCallbackQuery(CallbackQuery callbackQuery, TelegramClient telegramClient) {
+        try { dispatch(callbackQuery, telegramClient); }
+        catch (tg.configshop.telegram.SubscriptionSelectionException e) {
+            try { telegramClient.execute(org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery.builder().callbackQueryId(callbackQuery.getId()).text(e.getMessage()).showAlert(true).build()); }
+            catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException deliveryFailure) {
+                throw new IllegalStateException("Cannot deliver subscription selection message", deliveryFailure);
+            }
+        }
+    }
+
+    private void dispatch(CallbackQuery callbackQuery, TelegramClient telegramClient) {
 //        Long userAllowId = Long.parseLong(callbackQuery.getData().split(":")[1]);
         Long userCallbackId = callbackQuery.getFrom().getId();
 //        if (!userAllowId.equals(userCallbackId)) {

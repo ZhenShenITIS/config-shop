@@ -11,13 +11,11 @@ import tg.configshop.exceptions.subscription.InsufficientBalanceException;
 import tg.configshop.exceptions.subscription.SubscriptionNotFoundException;
 import tg.configshop.external_api.remnawave.RemnawaveClient;
 import tg.configshop.external_api.remnawave.config.RemnawaveApiVersion;
-import tg.configshop.model.BotUser;
 import tg.configshop.model.Purchase;
 import tg.configshop.model.Subscription;
 import tg.configshop.quartz.services.SchedulerService;
 import tg.configshop.services.BalanceService;
 import tg.configshop.services.SubscriptionService;
-import tg.configshop.services.UserService;
 
 import java.time.Instant;
 
@@ -26,7 +24,7 @@ import java.time.Instant;
 @RequiredArgsConstructor
 public class SubscriptionServiceImpl implements SubscriptionService {
     private final BalanceService balanceService;
-    private final UserService userService;
+    private final tg.configshop.services.SubscriptionAccessService subscriptions;
     private final RemnawaveClient remnawaveClient;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final RemnawaveApiVersion apiVersion;
@@ -68,24 +66,24 @@ public class SubscriptionServiceImpl implements SubscriptionService {
 
     @Override
     @Transactional
-    public void buySubscription(Long userId, int days, int devices) throws InsufficientBalanceException {
-        BotUser botUser = userService.getUser(userId);
+    public void buySubscription(java.util.UUID accountId, java.util.UUID subscriptionId, int days, int devices) throws InsufficientBalanceException {
+        var owned = subscriptions.requireOwned(accountId, subscriptionId);
         Subscription subscription = getSubscriptionByDaysAndDevices(days, devices);
-        apiVersion.select(botUser.remnawaveRef());
-        Instant currentExpiry = remnawaveClient.getUser(botUser.remnawaveRef()).expireAt();
+        apiVersion.select(owned.remnawaveRef());
+        Instant currentExpiry = remnawaveClient.getUser(owned.remnawaveRef()).expireAt();
         Instant now = Instant.now();
         Instant newExpired = (currentExpiry.isAfter(now) ? currentExpiry : now)
                 .plusSeconds(days * 86400L);
-        balanceService.purchase(Purchase.builder().account(botUser.getAccount())
-                .remnawaveSubscription(botUser.getSubscription()).paidAmount(subscription.getCost())
+        balanceService.purchase(Purchase.builder().account(owned.getAccount())
+                .remnawaveSubscription(owned).paidAmount(subscription.getCost())
                 .accountPriceRate(java.math.BigDecimal.ONE)
                 .subDays(days).subDevices(devices).build());
 
-        applicationEventPublisher.publishEvent(new SubscriptionPaidEvent(botUser, subscription, newExpired));
+        applicationEventPublisher.publishEvent(new SubscriptionPaidEvent(accountId, subscriptionId, subscription.getDeviceCount(), newExpired));
 
 
 
-        schedulerService.scheduleSubscriptionNotifications(botUser.getId(), newExpired);
+        schedulerService.scheduleSubscriptionNotifications(accountId, subscriptionId, newExpired);
 
 
     }

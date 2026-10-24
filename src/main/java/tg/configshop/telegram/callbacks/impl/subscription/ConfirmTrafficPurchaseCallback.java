@@ -1,6 +1,7 @@
 package tg.configshop.telegram.callbacks.impl.subscription;
 
 import lombok.RequiredArgsConstructor;
+import tg.configshop.telegram.TelegramUserService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
@@ -21,6 +22,7 @@ import tg.configshop.telegram.callbacks.Callback;
 @Component
 @RequiredArgsConstructor
 public class ConfirmTrafficPurchaseCallback implements Callback {
+    private final TelegramUserService userService;
     private static final String PAYLOAD_SEPARATOR = ":";
 
     private final TrafficPackageService trafficPackageService;
@@ -54,12 +56,14 @@ public class ConfirmTrafficPurchaseCallback implements Callback {
         }
 
         try {
-            trafficPackageService.buyTraffic(userId, trafficGb);
+            trafficPackageService.buyTraffic(userService.accountId(userId), userService.subscriptionId(userId), trafficGb);
             sendSuccessMessage(telegramClient, chatId, messageId, trafficGb);
         } catch (InsufficientBalanceException e) {
             sendInsufficientBalanceMessage(telegramClient, chatId, messageId);
         } catch (TrafficPackageNotFoundException e) {
             sendUnknownError(telegramClient, chatId, messageId);
+        } catch (tg.configshop.telegram.SubscriptionSelectionException e) {
+            throw e;
         } catch (Exception e) {
             e.printStackTrace();
             sendUnknownError(telegramClient, chatId, messageId);

@@ -10,8 +10,8 @@ import tg.configshop.exceptions.promocode.TooManyReferralPromoException;
 import tg.configshop.model.PromoCode;
 
 public interface PromoCodeService {
-    void activatePromoCode (String code, Long userId) throws PromoCodeAlreadyUsedException, PromoCodeEndedException, PromoCodeNotFoundException, ReferralPromoCodeAlreadyUsedException;
+    void activatePromoCode (String code, java.util.UUID accountId) throws PromoCodeAlreadyUsedException, PromoCodeEndedException, PromoCodeNotFoundException, ReferralPromoCodeAlreadyUsedException;
     void createPromoCode (PromoCode promoCode) throws PromoCodeAlreadyExistException;
-    void createReferralPromoCode (String code, Long userId) throws TooManyReferralPromoException, PromoCodeAlreadyExistException, InvalidSymbolsPromoException;
+    void createReferralPromoCode (String code, java.util.UUID accountId) throws TooManyReferralPromoException, PromoCodeAlreadyExistException, InvalidSymbolsPromoException;
 
 }

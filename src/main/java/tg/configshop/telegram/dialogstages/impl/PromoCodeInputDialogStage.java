@@ -1,6 +1,7 @@
 package tg.configshop.telegram.dialogstages.impl;
 
 import lombok.RequiredArgsConstructor;
+import tg.configshop.telegram.TelegramUserService;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -28,6 +29,7 @@ import tg.configshop.telegram.dialogstages.DialogStage;
 @RequiredArgsConstructor
 @Component
 public class PromoCodeInputDialogStage implements DialogStage {
+    private final TelegramUserService userService;
     private final PromoCodeService promoCodeService;
     private final UserStateRepository stateRepository;
     private final BackToMenuCallback backToMenuCallback;
@@ -65,7 +67,7 @@ public class PromoCodeInputDialogStage implements DialogStage {
 
         try {
 
-            promoCodeService.activatePromoCode(code, userId);
+            promoCodeService.activatePromoCode(code, userService.accountId(userId));
             responseText = MessageText.PROMO_SUCCESS.getMessageText();
             stateRepository.put(userId, DialogStageName.NONE);
 

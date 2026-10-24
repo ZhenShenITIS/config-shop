@@ -1,6 +1,7 @@
 package tg.configshop.telegram.callbacks.impl.devices;
 
 import lombok.RequiredArgsConstructor;
+import tg.configshop.telegram.TelegramUserService;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
@@ -17,6 +18,8 @@ import tg.configshop.telegram.callbacks.Callback;
 @Component
 @RequiredArgsConstructor
 public class PreviewDevicePurchaseCallback implements Callback {
+    private final tg.configshop.services.DevicePurchaseService devicePurchaseService;
+    private final TelegramUserService userService;
     private static final String PAYLOAD_SEPARATOR = ":";
 
     @Override
@@ -46,9 +49,14 @@ public class PreviewDevicePurchaseCallback implements Callback {
             return;
         }
 
-        int totalPrice = deviceCount * pricePerDevice;
-
-        showConfirmationDialog(telegramClient, chatId, messageId, deviceCount, pricePerDevice, totalPrice);
+        try {
+            long userId = callbackQuery.getFrom().getId();
+            var preview = devicePurchaseService.preview(userService.accountId(userId), userService.subscriptionId(userId), deviceCount);
+            showConfirmationDialog(telegramClient, chatId, messageId, deviceCount,
+                    Math.toIntExact(preview.unitPrice()), Math.toIntExact(preview.totalPrice()));
+        } catch (tg.configshop.telegram.SubscriptionSelectionException e) {
+            throw e;
+        } catch (RuntimeException e) { sendErrorMessage(telegramClient, chatId, messageId); }
     }
 
     private void showConfirmationDialog(TelegramClient client, Long chatId, Integer messageId,

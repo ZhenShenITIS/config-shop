@@ -11,12 +11,10 @@ import tg.configshop.events.TrafficPaidEvent;
 import tg.configshop.external_api.remnawave.config.RemnawaveApiVersion;
 import tg.configshop.exceptions.subscription.InsufficientBalanceException;
 import tg.configshop.exceptions.traffic.TrafficPackageNotFoundException;
-import tg.configshop.model.BotUser;
 import tg.configshop.model.Purchase;
 import tg.configshop.model.TrafficPackage;
 import tg.configshop.services.BalanceService;
 import tg.configshop.services.TrafficPackageService;
-import tg.configshop.services.UserService;
 
 import java.util.List;
 
@@ -27,7 +25,7 @@ public class TrafficPackageServiceImpl implements TrafficPackageService {
     private static final List<Integer> TRAFFIC_PACKAGE_SIZES = List.of(10, 30, 50, 100, 250, 500);
 
     private final BalanceService balanceService;
-    private final UserService userService;
+    private final tg.configshop.services.SubscriptionAccessService subscriptions;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final RemnawaveApiVersion apiVersion;
 
@@ -80,21 +78,21 @@ public class TrafficPackageServiceImpl implements TrafficPackageService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void buyTraffic(Long userId, int trafficGb) throws InsufficientBalanceException, TrafficPackageNotFoundException {
-        BotUser user = userService.getUser(userId);
+    public void buyTraffic(java.util.UUID accountId, java.util.UUID subscriptionId, int trafficGb) throws InsufficientBalanceException, TrafficPackageNotFoundException {
+        var owned = subscriptions.requireOwned(accountId, subscriptionId);
         TrafficPackage trafficPackage = getTrafficPackageByGb(trafficGb);
 
-        apiVersion.select(user.remnawaveRef());
+        apiVersion.select(owned.remnawaveRef());
         balanceService.purchase(Purchase.builder()
                 .purchaseType(PurchaseType.TRAFFIC)
-                .account(user.getAccount())
-                .remnawaveSubscription(user.getSubscription())
+                .account(owned.getAccount())
+                .remnawaveSubscription(owned)
                 .accountPriceRate(java.math.BigDecimal.ONE)
                 .paidAmount(trafficPackage.getCost())
                 .trafficGb(trafficPackage.getTrafficGb())
                 .build());
-        applicationEventPublisher.publishEvent(new TrafficPaidEvent(user.remnawaveRef(), trafficPackage.getTrafficGb()));
+        applicationEventPublisher.publishEvent(new TrafficPaidEvent(accountId, subscriptionId, trafficPackage.getTrafficGb()));
 
-        log.info("User {} bought {} GB traffic", userId, trafficPackage.getTrafficGb());
+        log.info("User {} bought {} GB traffic", accountId, trafficPackage.getTrafficGb());
     }
 }

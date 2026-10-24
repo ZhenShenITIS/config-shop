@@ -17,7 +17,8 @@ import tg.configshop.external_api.remnawave.dto.user.UserTraffic;
 import tg.configshop.model.BotUser;
 import tg.configshop.services.DeviceService;
 import tg.configshop.services.ExternalSubscriptionService;
-import tg.configshop.services.UserService;
+import tg.configshop.telegram.TelegramUserService;
+import tg.configshop.services.SubscriptionAccessService;
 import tg.configshop.util.RsaEncryptor;
 
 import java.time.Instant;
@@ -41,7 +42,7 @@ class SubscriptionCallbackTest {
         long userId = 42L;
         BotUser botUser = tg.configshop.TestUsers.user(736L, "remote-user", 123L);
         RemnawaveUserResponse response = RemnawaveUserResponse.builder()
-                .uuid(botUser.getRemnawaveUuid())
+                .id(123L).uuid(botUser.getRemnawaveUuid())
                 .telegramId(userId)
                 .subscriptionUrl(rawUrl)
                 .expireAt(Instant.now().plus(30, ChronoUnit.DAYS))
@@ -50,16 +51,22 @@ class SubscriptionCallbackTest {
                 .userTraffic(new UserTraffic(0L, 0L))
                 .build();
 
-        UserService userService = mock(UserService.class);
+        TelegramUserService userService = mock(TelegramUserService.class);
         DeviceService deviceService = mock(DeviceService.class);
         RemnawaveClient remnawaveClient = mock(RemnawaveClient.class);
         TelegramClient telegramClient = mock(TelegramClient.class);
         when(userService.getUser(userId)).thenReturn(botUser);
-        when(deviceService.getDevicesByUserId(userId)).thenReturn(List.of());
+        var accountId = botUser.getAccount().getId();
+        var subscriptionId = botUser.getSubscription().getId();
+        when(userService.accountId(userId)).thenReturn(accountId);
+        when(userService.subscriptionId(userId)).thenReturn(subscriptionId);
+        var access = mock(SubscriptionAccessService.class);
+        when(access.requireOwned(accountId, subscriptionId)).thenReturn(botUser.getSubscription());
+        when(deviceService.getDevices(accountId, subscriptionId)).thenReturn(List.of());
         when(remnawaveClient.getUser(botUser.remnawaveRef())).thenReturn(response);
 
         SubscriptionCallback callback = new SubscriptionCallback(userService, deviceService,
-                new ExternalSubscriptionService(remnawaveClient, userService));
+                new ExternalSubscriptionService(remnawaveClient, access));
         ReflectionTestUtils.setField(callback, "instructionUrl", "https://example.com/instructions");
 
         User user = new User(userId, "Test", false);
@@ -97,7 +104,7 @@ class SubscriptionCallbackTest {
             assertEquals(jsonMessage.getText(), edits.getValue().getText());
             encryptor.verify(() -> RsaEncryptor.encryptAndBuildLink(rawUrl + "/json"), times(2));
             encryptor.verify(() -> RsaEncryptor.encryptAndBuildLink(rawUrl));
-            verify(userService, times(3)).syncRemnawaveUserWithLocalUser(response, botUser);
+            verify(access, times(3)).requireOwned(accountId, subscriptionId);
 
             for (EditMessageText edit : edits.getAllValues()) {
                 assertEquals("42", edit.getChatId());

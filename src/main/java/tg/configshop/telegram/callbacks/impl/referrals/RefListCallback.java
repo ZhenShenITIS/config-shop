@@ -1,6 +1,7 @@
 package tg.configshop.telegram.callbacks.impl.referrals;
 
 import lombok.RequiredArgsConstructor;
+import tg.configshop.telegram.TelegramUserService;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
@@ -25,6 +26,7 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 public class RefListCallback implements Callback {
+    private final TelegramUserService userService;
 
     private final ReferralService referralService;
 
@@ -50,7 +52,7 @@ public class RefListCallback implements Callback {
         }
 
 
-        Page<ReferralWithProfitAndLevel> page = referralService.getReferralsWithProfitAndLevel(userId, pageNumber);
+        Page<ReferralWithProfitAndLevel> page = referralService.getReferralsWithProfitAndLevel(userService.accountId(userId), pageNumber, 15);
 
         String text;
         List<InlineKeyboardRow> rows = new ArrayList<>();
@@ -66,13 +68,13 @@ public class RefListCallback implements Callback {
             sb.append(MessageText.REFERRAL_LIST.getMessageText()).append("\n");
 
             for (ReferralWithProfitAndLevel item : page.getContent()) {
-                BotUser ref = item.botUser();
+                String referralName = userService.displayName(item.accountId());
 
                 String template = MessageText.REFERRAL_INFO.getMessageText();
 
                 String dateStr = DateUtil.getPrettyDate(item.referredAt());
 
-                String name = ref.getFirstName();
+                String name = tg.configshop.util.StringUtil.getSafeHtmlString(referralName);
 
                 sb.append(String.format(template, name, item.lvl(), item.profit(), dateStr)).append("\n\n");
             }

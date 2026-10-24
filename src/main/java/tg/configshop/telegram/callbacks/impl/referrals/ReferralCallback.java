@@ -14,7 +14,7 @@ import tg.configshop.constants.CallbackName;
 import tg.configshop.constants.MessageText;
 import tg.configshop.model.BotUser;
 import tg.configshop.services.ReferralService; // Твой интерфейс
-import tg.configshop.services.UserService;
+import tg.configshop.telegram.TelegramUserService;
 import tg.configshop.telegram.callbacks.Callback;
 
 import java.util.List;
@@ -24,7 +24,7 @@ import java.util.List;
 public class ReferralCallback implements Callback {
     private final CallbackName callbackName = CallbackName.REFERRAL;
     private final ReferralService referralService;
-    private final UserService userService;
+    private final TelegramUserService userService;
 
     @Value("${TELEGRAM_BOT_USERNAME}")
     private String botUsername;
@@ -40,10 +40,10 @@ public class ReferralCallback implements Callback {
         long chatId = callbackQuery.getMessage().getChatId();
         int messageId = callbackQuery.getMessage().getMessageId();
 
-        int allCount = referralService.getAllReferralCount(userId);
-        long profit = referralService.getAllProfit(userId);
-        long available = referralService.getAvailableSumToWithdraw(userId);
-        List<String> promoCode = referralService.getReferralPromoCodes(userId);
+        int allCount = referralService.getAllReferralCount(userService.accountId(userId));
+        long profit = referralService.getAllProfit(userService.accountId(userId));
+        long available = referralService.getAvailableSumToWithdraw(userService.accountId(userId));
+        List<String> promoCode = referralService.getReferralPromoCodes(userService.accountId(userId));
         BotUser botUser = userService.getUser(userId);
 
         int lvl1 = botUser.getReferralPercentage1lvl();

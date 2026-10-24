@@ -12,10 +12,10 @@ public interface TopUpRepository extends JpaRepository<TopUp, UUID> {
     @Query("""
         SELECT COALESCE(SUM(t.value), 0)
         FROM TopUp t
-        WHERE t.account.id = :userId
+        WHERE t.account.id = :accountId
           AND t.topUpSource = :source
     """)
-    Long getSumByUserIdAndSource(@Param("userId") UUID userId, @Param("source") TopUpSource source);
+    Long getSumByAccountIdAndSource(@Param("accountId") UUID accountId, @Param("source") TopUpSource source);
     boolean existsByPlatega_Id(java.util.UUID paymentId);
     boolean existsBySourcePayment_IdAndAccount_IdAndReferralLevel(java.util.UUID paymentId, java.util.UUID accountId, Short level);
 }

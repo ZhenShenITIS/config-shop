@@ -1,17 +1,4 @@
 package tg.configshop.events;
-
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
-
-@Getter
-@RequiredArgsConstructor
-public class ReferralRewardEvent {
-    private final long referrerId;
-    private final long sourceUserId;
-    private final String sourceFirstName;
-    private final String sourceUsername;
-    private final long rewardAmount;
-    private final int level;
-    private final long purchaseAmount;
-    private final double percentage;
-}
+import java.util.UUID;
+public record ReferralRewardEvent(UUID referrerAccountId, UUID sourceAccountId, long rewardAmount,
+                                  int level, long purchaseAmount, double percentage) {}

@@ -13,8 +13,8 @@ import tg.configshop.constants.ButtonText;
 import tg.configshop.constants.CallbackName;
 import tg.configshop.constants.MessageText;
 import tg.configshop.model.BotUser;
-import tg.configshop.services.RegistrationService;
-import tg.configshop.services.UserService;
+import tg.configshop.telegram.TelegramRegistrationService;
+import tg.configshop.telegram.TelegramUserService;
 import tg.configshop.telegram.dto.BotMessageParams;
 import tg.configshop.util.DateUtil;
 import tg.configshop.util.StringUtil;
@@ -22,8 +22,8 @@ import tg.configshop.util.StringUtil;
 @Component
 @RequiredArgsConstructor
 public class StartCommandBody {
-    private final RegistrationService registrationService;
-    private final UserService userService;
+    private final TelegramRegistrationService registrationService;
+    private final TelegramUserService userService;
     private final ExternalSubscriptionService externalSubscriptionService;
 
     @Value("${CONFIG_PANEL_SUB_URL}")
@@ -51,11 +51,16 @@ public class StartCommandBody {
 
         String firstName = StringUtil.getSafeHtmlString(user.getFirstName());
 
-        java.time.Instant expiry = externalSubscriptionService.getExternalUser(userId).expireAt();
+        String selectionProblem = null;
+        java.time.Instant expiry = java.time.Instant.EPOCH;
+        try { expiry = externalSubscriptionService.getExternalUser(userService.accountId(userId), userService.subscriptionId(userId)).expireAt(); }
+        catch (tg.configshop.telegram.SubscriptionSelectionException e) { selectionProblem = e.getMessage(); }
         String text = DateUtil.isExpired(expiry) ?
                 MessageText.START_TEXT_EXPIRED.getMessageText().formatted(firstName)
                 :
                 MessageText.START_TEXT_ACTIVE.getMessageText().formatted(firstName, DateUtil.getDateEndSubscription(expiry));
+
+        if (selectionProblem != null) text = selectionProblem;
 
         InlineKeyboardMarkup keyboard = InlineKeyboardMarkup
                 .builder()

@@ -1,4 +1,4 @@
-package tg.configshop.listeners;
+package tg.configshop.telegram;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,32 +18,32 @@ import tg.configshop.util.StringUtil;
 public class ReferralNotificationListener {
 
     private final TelegramClient telegramClient;
+    private final TelegramUserService users;
 
     @Async
-    @EventListener
+    @org.springframework.transaction.event.TransactionalEventListener(phase = org.springframework.transaction.event.TransactionPhase.AFTER_COMMIT)
     public void handleRewardNotification(ReferralRewardEvent event) {
 
-        String text = MessageText.REFERRAL_REWARD_NOTIFICATION.getMessageText().formatted(
-                event.getLevel(),
-                event.getSourceUserId(),
-                getSafeName(event.getSourceFirstName()),
-                getSafeUsername(event.getSourceUsername()),
-                event.getPurchaseAmount(),
-                event.getPercentage(),
-                event.getRewardAmount()
-        );
+        var recipient = users.findByAccountId(event.referrerAccountId());
+        if (recipient.isEmpty()) return;
+        var source = users.findByAccountId(event.sourceAccountId());
+        String text = source.map(profile -> MessageText.REFERRAL_REWARD_NOTIFICATION.getMessageText().formatted(
+                event.level(), profile.getId(), getSafeName(profile.getFirstName()), getSafeUsername(profile.getUsername()),
+                event.purchaseAmount(), event.percentage(), event.rewardAmount()))
+                .orElse("💸 <b>Реферальное начисление!</b>\n\nРеферал " + event.level() + "-го уровня пополнил баланс на "
+                        + event.purchaseAmount() + " ₽. Вам зачислено: " + event.rewardAmount() + " ₽.");
 
         SendMessage sendMessage = SendMessage.builder()
-                .chatId(event.getReferrerId())
+                .chatId(recipient.get().getId())
                 .text(text)
                 .parseMode("HTML")
                 .build();
 
         try {
             telegramClient.execute(sendMessage);
-            log.info("Referral reward notification sent to user {}", event.getReferrerId());
+            log.info("Referral reward notification sent to user {}", recipient.get().getId());
         } catch (TelegramApiException e) {
-            log.error("Failed to send referral reward notification to user {}: {}", event.getReferrerId(), e.getMessage());
+            log.error("Failed to send referral reward notification to user {}: {}", recipient.get().getId(), e.getMessage());
         }
     }
 

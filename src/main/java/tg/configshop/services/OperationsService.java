@@ -12,13 +12,14 @@ import tg.configshop.repositories.PurchaseRepository;
 @RequiredArgsConstructor
 public class OperationsService {
     private final PurchaseRepository purchaseRepository;
-    private final UserService userService;
-    private final int OPERATION_PAGE_SIZE = 10;
+    private final AccountService accounts;
 
 
-    public Page<OperationView> getOperationsByUserId (long userId, int pageNumber) {
-        Pageable pageable = PageRequest.of(pageNumber, OPERATION_PAGE_SIZE);
+    public Page<OperationView> getOperations(java.util.UUID accountId, int pageNumber, int pageSize) {
+        accounts.requireAccount(accountId);
+        if (pageSize < 1 || pageSize > 100) throw new IllegalArgumentException("Invalid page size");
+        Pageable pageable = PageRequest.of(pageNumber, pageSize);
 
-        return purchaseRepository.findOperationsByUserId(userService.getUser(userId).getAccount().getId(), pageable);
+        return purchaseRepository.findOperationsByAccountId(accountId, pageable);
     }
 }

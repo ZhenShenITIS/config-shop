@@ -30,9 +30,9 @@ public interface ReferralRepository extends JpaRepository<Referral, UUID> {
         )
         SELECT COUNT(*) > 0
         FROM ancestors
-        WHERE referrer_id = :currentUserId
+        WHERE referrer_id = :accountId
         """, nativeQuery = true)
-    boolean isUserAncestorOf(@Param("currentUserId") UUID currentUserId,
+    boolean isAccountAncestorOf(@Param("accountId") UUID accountId,
                              @Param("potentialReferrerId") UUID potentialReferrerId);
 
 
@@ -60,16 +60,14 @@ public interface ReferralRepository extends JpaRepository<Referral, UUID> {
             WHERE rt.lvl < 3
         )
         SELECT
-            b.telegram_id                 AS userId,
-            b.name                  AS firstName,
+            rt.referral_id                AS accountId,
             rt.referred_at                AS referredAt,
             rt.lvl                        AS lvl,
             COALESCE(SUM(t.value), 0)     AS profit
         FROM referral_tree rt
-        JOIN bot_users b ON rt.referral_id = b.account_id
         LEFT JOIN top_ups t
             ON t.referral_id = rt.referral_id AND t.top_up_source = 'REFERRAL' AND t.account_id = :referrerId
-        GROUP BY b.telegram_id, b.name, rt.referred_at, rt.lvl
+        GROUP BY rt.referral_id, rt.referred_at, rt.lvl
         ORDER BY rt.lvl, rt.referred_at DESC
         """,
             countQuery = """

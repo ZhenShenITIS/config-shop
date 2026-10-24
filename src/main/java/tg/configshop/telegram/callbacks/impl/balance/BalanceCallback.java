@@ -13,14 +13,14 @@ import tg.configshop.constants.ButtonText;
 import tg.configshop.constants.CallbackName;
 import tg.configshop.constants.MessageText;
 import tg.configshop.model.BotUser;
-import tg.configshop.services.UserService;
+import tg.configshop.telegram.TelegramUserService;
 import tg.configshop.telegram.callbacks.Callback;
 
 @Component
 @RequiredArgsConstructor
 public class BalanceCallback implements Callback {
     private final CallbackName callbackName = CallbackName.BALANCE;
-    private final UserService userService;
+    private final TelegramUserService userService;
 
     @Override
     public CallbackName getCallback() {

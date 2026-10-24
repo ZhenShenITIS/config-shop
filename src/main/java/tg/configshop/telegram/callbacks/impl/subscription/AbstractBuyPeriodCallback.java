@@ -68,14 +68,11 @@ public abstract class AbstractBuyPeriodCallback implements Callback {
         int min = subscriptionService.getMinDeviceCount();
         int max = subscriptionService.getMaxDeviceCount();
         int days = getDaysPeriod();
-        int basePrice = subscriptionService.getBaseSubscriptionCostByDays(days);
-        int extraPrice = subscriptionService.getExtraPricePerDeviceByDays(days);
 
         for (int devices = min; devices <= max; devices++) {
             boolean isSelected = (devices == selectedDevices);
 
-            int extraDevsCount = Math.max(0, devices - min);
-            long totalPrice = basePrice + (long) extraDevsCount * extraPrice;
+            long totalPrice = subscriptionService.getSubscriptionByDaysAndDevices(days, devices).getCost();
 
             String text;
             if (isSelected) {

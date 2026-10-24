@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.util.List;
 
 public interface RemnawaveClient {
+    default RemnawaveUserResponse createBasicUser(String username) { return createBasicUser(username, null); }
     RemnawaveUserResponse createBasicUser (String username, Long telegramId);
     RemnawaveUserResponse getUser (RemnawaveUserRef user);
     RemnawaveUserResponse getUserByUsername (String username);

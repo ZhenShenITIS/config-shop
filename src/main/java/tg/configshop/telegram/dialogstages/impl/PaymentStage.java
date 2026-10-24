@@ -1,6 +1,7 @@
 package tg.configshop.telegram.dialogstages.impl;
 
 import lombok.RequiredArgsConstructor;
+import tg.configshop.telegram.TelegramUserService;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -15,7 +16,7 @@ import tg.configshop.constants.ButtonText;
 import tg.configshop.constants.CallbackName;
 import tg.configshop.constants.DialogStageName;
 import tg.configshop.constants.MessageText;
-import tg.configshop.external_api.pay.model.PlategaPayment;
+import tg.configshop.dto.PaymentView;
 import tg.configshop.repositories.UserStateRepository;
 import tg.configshop.services.PaymentService;
 import tg.configshop.telegram.callbacks.impl.payment.TopUpCallback;
@@ -29,14 +30,15 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 public class PaymentStage implements DialogStage {
+    private final TelegramUserService userService;
     private final UserStateRepository stateRepository;
     private final TopUpCallback topUpCallback;
     private final PaymentService paymentService;
     private final StartCommandBody startCommandBody;
 
     public static final String PAYLOAD_SEPARATOR = ":";
-    public static final long MIN_PAY_AMOUNT = 100;
-    public static final long MAX_PAY_AMOUNT = 10000;
+    @org.springframework.beans.factory.annotation.Value("${TELEGRAM_BOT_USERNAME}")
+    private String botUsername;
 
 
     @Override
@@ -75,14 +77,14 @@ public class PaymentStage implements DialogStage {
             sendNumberFormatError(chatId, telegramClient);
             return;
         }
-        if (amount < MIN_PAY_AMOUNT || amount > MAX_PAY_AMOUNT) {
+        if (amount < paymentService.limits().minimum() || amount > paymentService.limits().maximum()) {
             sendSumError(chatId, telegramClient);
             return;
         }
         stateRepository.put(userId, DialogStageName.NONE);
-        PlategaPayment plategaPayment = paymentService.createPlategaPayment(amount, stateRepository.getPaymentContext(userId).paymentMethod().getIntMethod(), userId);
+        PaymentView plategaPayment = paymentService.createPlategaPayment(amount, stateRepository.getPaymentContext(userId).paymentMethod().getIntMethod(), userService.accountId(userId), "https://t.me/" + botUsername, "https://t.me/" + botUsername);
 
-        String shortId = plategaPayment.getTransactionId().split("-")[0];
+        String shortId = plategaPayment.transactionId().split("-")[0];
 
         String text = String.format(MessageText.PAYMENT_INSTRUCTION.getMessageText(), amount, shortId);
 
@@ -90,13 +92,13 @@ public class PaymentStage implements DialogStage {
 
         InlineKeyboardButton payButton = InlineKeyboardButton.builder()
                 .text(ButtonText.PAY_ACTION.getText())
-                .url(plategaPayment.getRedirect())
+                .url(plategaPayment.redirect())
                 .build();
         rows.add(new InlineKeyboardRow(payButton));
 
         String checkPayload = CallbackName.CHECK_STATUS_PAYMENT.getCallbackName()
                               + PAYLOAD_SEPARATOR
-                              + plategaPayment.getTransactionId();
+                              + plategaPayment.transactionId();
 
         InlineKeyboardButton checkButton = InlineKeyboardButton.builder()
                 .text(ButtonText.CHECK_PAYMENT.getText())
@@ -137,7 +139,7 @@ public class PaymentStage implements DialogStage {
         SendMessage sendMessage = SendMessage
                 .builder()
                 .chatId(chatId)
-                .text(MessageText.SUM_PAY_ERROR.getMessageText().formatted(MIN_PAY_AMOUNT, MAX_PAY_AMOUNT))
+                .text(MessageText.SUM_PAY_ERROR.getMessageText().formatted(paymentService.limits().minimum(), paymentService.limits().maximum()))
                 .parseMode("HTML")
                 .build();
         try {

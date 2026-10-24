@@ -1,13 +1,4 @@
 package tg.configshop.dto;
-
-import tg.configshop.model.BotUser;
-
 import java.time.Instant;
-
-public record ReferralWithProfitAndLevel(
-        BotUser botUser,
-        Long profit,
-        Instant referredAt,
-        int lvl
-) {
-}
+import java.util.UUID;
+public record ReferralWithProfitAndLevel(UUID accountId, Long profit, Instant referredAt, int lvl) {}

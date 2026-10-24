@@ -12,10 +12,10 @@ public interface WithdrawalRepository extends JpaRepository<Withdrawal, UUID> {
     @Query("""
     SELECT COALESCE(SUM(w.amount), 0)
     FROM Withdrawal w
-    WHERE w.account.id = :userId
+    WHERE w.account.id = :accountId
       AND w.status IN ('DONE', 'IN_PROGRESS')
     """)
-    Long sumConsumedReferralBalance(@Param("userId") UUID userId);
+    Long sumConsumedReferralBalance(@Param("accountId") UUID accountId);
     @Lock(LockModeType.PESSIMISTIC_WRITE) @Query("select w from Withdrawal w where w.id = :id")
     Optional<Withdrawal> findByIdWithLock(UUID id);
 }

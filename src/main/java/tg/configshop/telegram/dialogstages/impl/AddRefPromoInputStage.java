@@ -1,6 +1,7 @@
 package tg.configshop.telegram.dialogstages.impl;
 
 import lombok.RequiredArgsConstructor;
+import tg.configshop.telegram.TelegramUserService;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -25,6 +26,7 @@ import tg.configshop.telegram.dialogstages.DialogStage;
 @Component
 @RequiredArgsConstructor
 public class AddRefPromoInputStage implements DialogStage {
+    private final TelegramUserService userService;
     private final UserStateRepository stateRepository;
     private final ReferralCallback referralCallback;
     private final PromoCodeService promoCodeService;
@@ -62,7 +64,7 @@ public class AddRefPromoInputStage implements DialogStage {
 
         try {
 
-            promoCodeService.createReferralPromoCode(code, userId);
+            promoCodeService.createReferralPromoCode(code, userService.accountId(userId));
             responseText = MessageText.ADD_REF_PROMO_SUCCESS.getMessageText();
             stateRepository.put(userId, DialogStageName.NONE);
 

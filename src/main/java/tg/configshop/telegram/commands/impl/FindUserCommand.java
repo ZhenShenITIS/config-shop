@@ -12,7 +12,7 @@ import org.telegram.telegrambots.meta.generics.TelegramClient;
 import tg.configshop.aop.AdminOnly;
 import tg.configshop.constants.CommandName;
 import tg.configshop.model.BotUser;
-import tg.configshop.services.UserService;
+import tg.configshop.telegram.TelegramUserService;
 import tg.configshop.telegram.commands.Command;
 
 import java.util.List;
@@ -20,7 +20,7 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 public class FindUserCommand implements Command {
-    private final UserService userService;
+    private final TelegramUserService userService;
     private final ObjectMapper objectMapper;
 
 

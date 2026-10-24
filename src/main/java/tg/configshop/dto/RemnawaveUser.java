@@ -9,14 +9,12 @@ public record RemnawaveUser(
         String uuid,
         Long id,
         String username,
-        long telegramId,
         String shortUuid,
         double trafficLimitGigaBytes,
         int hwidDeviceLimit,
         UserTrafficInGigabytes userTraffic,
         Instant expireAt,
         String subscriptionUrl,
-        String prettyDateExpireAt,
         long daysLeft,
         boolean isActive
 ) {

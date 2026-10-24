@@ -15,7 +15,7 @@ import tg.configshop.aop.AdminOnly;
 import tg.configshop.constants.CommandName;
 import tg.configshop.constants.MessageText;
 import tg.configshop.model.BotUser;
-import tg.configshop.services.UserService;
+import tg.configshop.telegram.TelegramUserService;
 import tg.configshop.telegram.commands.Command;
 
 import java.util.List;
@@ -28,7 +28,7 @@ import java.util.regex.Pattern;
 @Component
 @RequiredArgsConstructor
 public class BroadcastCommand implements Command {
-    private final UserService userService;
+    private final TelegramUserService userService;
     private final Semaphore rateLimiter = new Semaphore(25);
 
     @Override

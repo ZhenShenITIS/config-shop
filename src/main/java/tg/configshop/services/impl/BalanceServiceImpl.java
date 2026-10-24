@@ -18,6 +18,11 @@ public class BalanceServiceImpl implements BalanceService {
     private final PurchaseRepository purchases;
     private final WithdrawalRepository withdrawals;
     @Override public long balance(UUID accountId) { return log.balance(accountId); }
+    @Override @Transactional
+    public void adjustAsAdmin(UUID accountId, long amount) {
+        Account account = accounts.findByIdWithLock(accountId).orElseThrow();
+        credit(TopUp.builder().account(account).value(amount).topUpSource(TopUpSource.ADMIN).build());
+    }
     private void lock(Account account) { accounts.findByIdWithLock(account.getId()).orElseThrow(); }
     private void checkFunds(Account account, long amount) {
         if (amount < 0) throw new IllegalArgumentException("Negative debit");

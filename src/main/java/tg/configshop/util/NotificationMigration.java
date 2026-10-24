@@ -7,9 +7,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
-import tg.configshop.model.BotUser;
+import tg.configshop.model.RemnawaveSubscription;
 import tg.configshop.quartz.services.SchedulerService;
-import tg.configshop.repositories.BotUserRepository;
+import tg.configshop.repositories.RemnawaveSubscriptionRepository;
 
 import java.time.Instant;
 import java.util.List;
@@ -19,7 +19,7 @@ import java.util.List;
 @Slf4j
 public class NotificationMigration implements CommandLineRunner {
 
-    private final BotUserRepository userRepository;
+    private final RemnawaveSubscriptionRepository userRepository;
     private final SchedulerService schedulerService;
     private final ExternalSubscriptionService externalSubscriptionService;
     @Value("${MIGRATION_NOTIFICATION}")
@@ -36,24 +36,24 @@ public class NotificationMigration implements CommandLineRunner {
         log.info("=== Starting Quartz migration for existing users ===");
 
         Instant now = Instant.now();
-        List<BotUser> users = userRepository.findAll();
+        List<RemnawaveSubscription> users = userRepository.findAll();
 
         int total = 0;
         int scheduled = 0;
         int expired = 0;
         int errors = 0;
 
-        for (BotUser user : users) {
+        for (RemnawaveSubscription user : users) {
             total++;
 
             try {
-                Instant expiry = externalSubscriptionService.getExternalUser(user.getId()).expireAt();
+                Instant expiry = externalSubscriptionService.getExternalUser(user.getAccount().getId(), user.getId()).expireAt();
                 if (expiry == null || expiry.isBefore(now)) {
                     expired++;
                     continue;
                 }
                 schedulerService.scheduleSubscriptionNotifications(
-                        user.getId(),
+                        user.getAccount().getId(), user.getId(),
                         expiry
                 );
                 scheduled++;

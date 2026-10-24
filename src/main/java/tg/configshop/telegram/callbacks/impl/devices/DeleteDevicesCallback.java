@@ -1,6 +1,7 @@
 package tg.configshop.telegram.callbacks.impl.devices;
 
 import lombok.RequiredArgsConstructor;
+import tg.configshop.telegram.TelegramUserService;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
@@ -11,7 +12,7 @@ import org.telegram.telegrambots.meta.generics.TelegramClient;
 import tg.configshop.constants.ButtonText;
 import tg.configshop.constants.CallbackName;
 import tg.configshop.constants.MessageText;
-import tg.configshop.external_api.remnawave.dto.device.Device;
+import tg.configshop.dto.DeviceView;
 import tg.configshop.services.DeviceService;
 import tg.configshop.telegram.callbacks.Callback;
 
@@ -21,6 +22,7 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 public class DeleteDevicesCallback implements Callback {
+    private final TelegramUserService userService;
     private static final String PAYLOAD_SEPARATOR = ":";
     private static final int DEVICES_PER_PAGE = 5;
 
@@ -65,9 +67,11 @@ public class DeleteDevicesCallback implements Callback {
     private void deleteDeviceAndShowList(Long userId, String hwid, int page,
                                          CallbackQuery callbackQuery, TelegramClient telegramClient) {
         try {
-            deviceService.deleteDeviceById(userId, hwid);
+            deviceService.deleteDeviceById(userService.accountId(userId), userService.subscriptionId(userId), hwid);
 
             showDevicesList(userId, page, callbackQuery, telegramClient);
+        } catch (tg.configshop.telegram.SubscriptionSelectionException e) {
+            throw e;
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -75,7 +79,7 @@ public class DeleteDevicesCallback implements Callback {
 
     private void showDevicesList(Long userId, int page,
                                  CallbackQuery callbackQuery, TelegramClient telegramClient) {
-        List<Device> devices = deviceService.getDevicesByUserId(userId);
+        List<DeviceView> devices = deviceService.getDevices(userService.accountId(userId), userService.subscriptionId(userId));
 
         if (devices.isEmpty()) {
             sendNoDevicesMessage(callbackQuery, telegramClient);
@@ -91,7 +95,7 @@ public class DeleteDevicesCallback implements Callback {
 
         int fromIndex = page * DEVICES_PER_PAGE;
         int toIndex = Math.min(fromIndex + DEVICES_PER_PAGE, devices.size());
-        List<Device> devicesOnPage = devices.subList(fromIndex, toIndex);
+        List<DeviceView> devicesOnPage = devices.subList(fromIndex, toIndex);
 
 
         String text = MessageText.DELETE_DEVICES_MENU.getMessageText()
@@ -101,7 +105,7 @@ public class DeleteDevicesCallback implements Callback {
         List<InlineKeyboardRow> rows = new ArrayList<>();
 
 
-        for (Device device : devicesOnPage) {
+        for (DeviceView device : devicesOnPage) {
             InlineKeyboardRow row = new InlineKeyboardRow();
             String deviceText = String.format("%s — %s", device.platform(), device.deviceModel());
             row.add(InlineKeyboardButton.builder()

@@ -1,11 +1,8 @@
 package tg.configshop.services;
-
-import org.telegram.telegrambots.meta.api.objects.User;
-import org.telegram.telegrambots.meta.api.objects.message.Message;
-import tg.configshop.model.BotUser;
-
+import java.util.UUID;
+import tg.configshop.dto.InitialSubscriptionData;
+import tg.configshop.dto.SubscriptionSummary;
 public interface RegistrationService {
-    boolean isRegistered (Long userId);
-    BotUser registerUser (User user, Long referrerId);
-
+    SubscriptionSummary createTrialSubscription(UUID accountId);
+    SubscriptionSummary registerInitialSubscription(UUID accountId, InitialSubscriptionData initial);
 }

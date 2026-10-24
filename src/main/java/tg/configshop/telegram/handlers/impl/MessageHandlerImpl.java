@@ -25,6 +25,16 @@ public class MessageHandlerImpl implements MessageHandler {
 
     @Override
     public void answerMessage(Message message, TelegramClient telegramClient) {
+        try { dispatch(message, telegramClient); }
+        catch (tg.configshop.telegram.SubscriptionSelectionException e) {
+            try { telegramClient.execute(org.telegram.telegrambots.meta.api.methods.send.SendMessage.builder().chatId(message.getChatId()).text(e.getMessage()).build()); }
+            catch (org.telegram.telegrambots.meta.exceptions.TelegramApiException deliveryFailure) {
+                throw new IllegalStateException("Cannot deliver subscription selection message", deliveryFailure);
+            }
+        }
+    }
+
+    private void dispatch(Message message, TelegramClient telegramClient) {
         DialogStageName stage = userStateRepository.get(message.getFrom().getId());
 
         if (!stage.equals(DialogStageName.NONE)) {

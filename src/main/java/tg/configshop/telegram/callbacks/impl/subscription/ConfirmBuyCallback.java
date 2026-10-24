@@ -50,26 +50,17 @@ public class ConfirmBuyCallback implements Callback {
         }
 
 
-        Subscription subscription = subscriptionService.getSubscriptionByDaysAndDevices(days, devices);
-
-
-        int minDevices = subscriptionService.getMinDeviceCount();
-        int basePrice = subscriptionService.getBaseSubscriptionCostByDays(days);
-
-        int extraDevicesCount = Math.max(0, devices - minDevices);
-        int extraPricePerUnit = subscriptionService.getExtraPricePerDeviceByDays(days);
-        int totalExtraPrice = extraDevicesCount * extraPricePerUnit;
-
-        long finalPrice = subscription.getCost();
+        var preview = subscriptionService.previewPurchase(days, devices);
+        long finalPrice = preview.totalPrice();
 
         String periodText = formatPeriod(days);
 
         String summaryText = MessageText.CONFIRM_BUY_SUMMARY.getMessageText().formatted(
                 periodText,
                 devices,
-                basePrice,
-                extraDevicesCount,
-                totalExtraPrice,
+                preview.basePrice(),
+                preview.extraDevices(),
+                preview.extraPrice(),
                 finalPrice
         );
 

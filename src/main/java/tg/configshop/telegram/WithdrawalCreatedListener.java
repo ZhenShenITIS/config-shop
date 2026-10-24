@@ -1,4 +1,4 @@
-package tg.configshop.listeners;
+package tg.configshop.telegram;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,7 +15,7 @@ import tg.configshop.constants.CallbackName;
 import tg.configshop.constants.MessageText;
 import tg.configshop.events.WithdrawalCreatedEvent;
 import tg.configshop.model.BotUser;
-import tg.configshop.model.Withdrawal;
+import tg.configshop.dto.WithdrawalDetails;
 import tg.configshop.repositories.AdministratorRepository;
 import tg.configshop.services.WithdrawalService;
 import tg.configshop.util.StringUtil;
@@ -31,12 +31,13 @@ public class WithdrawalCreatedListener {
     private final TelegramClient telegramClient;
     private final AdministratorRepository administratorRepository;
     private final WithdrawalService withdrawalService;
+    private final TelegramUserService users;
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleWithdrawalCreated(WithdrawalCreatedEvent event) {
         try {
-            Withdrawal withdrawal = withdrawalService.getWithdrawal(event.getWithdrawalId().toString());
-            BotUser user = withdrawalService.getRecipient(withdrawal);
+            WithdrawalDetails withdrawal = withdrawalService.getWithdrawal(event.getWithdrawalId().toString());
+            BotUser user = users.getRecipient(withdrawal);
             List<Long> adminIds = administratorRepository.getAdminIdList();
 
             String text = formatAdminMessage(withdrawal, user);
@@ -62,13 +63,16 @@ public class WithdrawalCreatedListener {
         }
     }
 
-    public static String formatAdminMessage(Withdrawal wd, BotUser user) {
+    public static String formatAdminMessage(WithdrawalDetails wd, BotUser user) {
         String statusIcon = switch (wd.getStatus()) {
             case IN_PROGRESS -> "⏳ В ожидании";
             case DONE -> "✅ Выполнено";
             case REJECTED -> "❌ Отклонено";
         };
 
+        if (user == null) return "🔔 <b>Заявка на вывод</b>\nID: <code>" + wd.getPublicId()
+                + "</code>\nАккаунт: <code>" + wd.accountId() + "</code>\nСумма: " + wd.getAmount()
+                + " ₽\nТип: " + wd.getType() + "\nРеквизиты: " + StringUtil.getSafeHtmlString(wd.getRequisites()) + "\n" + statusIcon;
         String name = StringUtil.getSafeHtmlString(user.getFirstName());
         String type = wd.getType().name(); // Или красивое название из ENUM
 

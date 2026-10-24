@@ -1,7 +1,9 @@
 package tg.configshop.quartz.services;
 
-import tg.configshop.repositories.RemnawaveSubscriptionRepository;
-import tg.configshop.repositories.BotUserRepository;
+import tg.configshop.services.SubscriptionAccessService;
+import tg.configshop.services.LegacyNotificationResolver;
+import org.springframework.beans.factory.ObjectProvider;
+import java.util.UUID;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,40 +31,48 @@ import java.util.Date;
 public class SchedulerService {
 
     private final Scheduler scheduler;
-    private final BotUserRepository users;
-    private final RemnawaveSubscriptionRepository subscriptions;
+    private final SubscriptionAccessService subscriptions;
+    private final ObjectProvider<LegacyNotificationResolver> legacy;
 
     private static final String SUBSCRIPTION_GROUP = "subscription_notifications";
     private static final String TRIAL_GROUP = "trial_checks";
 
-    public void scheduleSubscriptionNotifications(Long userId, Instant expireAt) {
-        scheduleSubscriptionNotifications(userId, users.findById(userId).orElseThrow().getSubscription().getId(), expireAt);
-    }
-
-    public void scheduleSubscriptionNotifications(Long userId, java.util.UUID subscriptionId, Instant expireAt) {
-        checkOwner(userId, subscriptionId);
+    public void scheduleSubscriptionNotifications(UUID accountId, UUID subscriptionId, Instant expireAt) {
+        subscriptions.requireOwned(accountId, subscriptionId);
         try {
 
-            scheduleSubscriptionJob(userId, subscriptionId, expireAt, Duration.ofDays(3), ExpirySubNotificationType.DAYS_LEFT_3.name());
+            scheduleSubscriptionJob(accountId, subscriptionId, expireAt, Duration.ofDays(3), ExpirySubNotificationType.DAYS_LEFT_3.name());
 
-            scheduleSubscriptionJob(userId, subscriptionId, expireAt, Duration.ofDays(1), ExpirySubNotificationType.DAYS_LEFT_1.name());
+            scheduleSubscriptionJob(accountId, subscriptionId, expireAt, Duration.ofDays(1), ExpirySubNotificationType.DAYS_LEFT_1.name());
 
-            log.info("Scheduled subscription notifications for user {}", userId);
+            log.info("Scheduled subscription notifications for account {}", accountId);
 
         } catch (SchedulerException e) {
             log.error("Failed to schedule subscription notifications: {}", e.getMessage());
         }
     }
 
-    private void scheduleSubscriptionJob(Long userId, java.util.UUID subscriptionUuid, Instant expireAt,
+    private void scheduleSubscriptionJob(UUID accountId, UUID subscriptionUuid, Instant expireAt,
                                          Duration beforeExpiry, String type)
             throws SchedulerException {
 
         Instant executeAt = expireAt.minus(beforeExpiry);
         String subscriptionId = subscriptionUuid.toString();
         String jobName = String.format("sub_notify_%s_%s", type, subscriptionId);
-        JobKey legacyKey = JobKey.jobKey(String.format("sub_notify_%s_%d", type, userId), SUBSCRIPTION_GROUP);
-        if (scheduler.checkExists(legacyKey)) scheduler.deleteJob(legacyKey);
+        var resolver = legacy.getIfAvailable();
+        for (Long recipientId : resolver == null ? java.util.List.<Long>of() : resolver.recipientIds(accountId)) {
+            JobKey legacyKey = JobKey.jobKey(String.format("sub_notify_%s_%d", type, recipientId), SUBSCRIPTION_GROUP);
+            if (scheduler.checkExists(legacyKey)) {
+                JobDetail old = scheduler.getJobDetail(legacyKey);
+                if (old == null) continue;
+                String oldSubscriptionId = old.getJobDataMap().getString("subscriptionId");
+                if (oldSubscriptionId == null) {
+                    try { oldSubscriptionId = resolver.subscriptionId(recipientId).toString(); }
+                    catch (IllegalStateException unresolved) { continue; }
+                }
+                if (subscriptionId.equals(oldSubscriptionId)) scheduler.deleteJob(legacyKey);
+            }
+        }
         JobKey jobKey = JobKey.jobKey(jobName, SUBSCRIPTION_GROUP);
 
         if (!executeAt.isAfter(Instant.now())) {
@@ -81,7 +91,7 @@ public class SchedulerService {
 
         JobDetail job = JobBuilder.newJob(SubscriptionExpiryNotificationJob.class)
                 .withIdentity(jobKey)
-                .usingJobData("userId", userId)
+                .usingJobData("accountId", accountId.toString())
                 .usingJobData("subscriptionId", subscriptionId)
                 .usingJobData("type", type)
                 .usingJobData("expireAt", expireAt.toString())
@@ -100,26 +110,22 @@ public class SchedulerService {
     }
 
 
-    public void scheduleTrialTrafficChecks(Long userId) {
-        scheduleTrialTrafficChecks(userId, users.findById(userId).orElseThrow().getSubscription().getId());
-    }
-
-    public void scheduleTrialTrafficChecks(Long userId, java.util.UUID subscriptionId) {
-        checkOwner(userId, subscriptionId);
+    public void scheduleTrialTrafficChecks(UUID accountId, UUID subscriptionId) {
+        subscriptions.requireOwned(accountId, subscriptionId);
         try {
             Instant now = Instant.now();
 
-            scheduleTrafficCheckJob(userId, subscriptionId, now.plus(Duration.ofHours(12)), TrialNotificationType.HOUR_12.name());
+            scheduleTrafficCheckJob(accountId, subscriptionId, now.plus(Duration.ofHours(12)), TrialNotificationType.HOUR_12.name());
 
 
-            scheduleTrafficCheckJob(userId, subscriptionId, now.plus(Duration.ofDays(1)), TrialNotificationType.HOUR_24.name());
+            scheduleTrafficCheckJob(accountId, subscriptionId, now.plus(Duration.ofDays(1)), TrialNotificationType.HOUR_24.name());
 
 
-            scheduleTrafficCheckJob(userId, subscriptionId, now.plus(Duration.ofDays(2)), TrialNotificationType.HOUR_48.name());
+            scheduleTrafficCheckJob(accountId, subscriptionId, now.plus(Duration.ofDays(2)), TrialNotificationType.HOUR_48.name());
 
 
 
-            log.info("Scheduled trial traffic checks for user {}", userId);
+            log.info("Scheduled trial traffic checks for account {}", accountId);
 
         } catch (SchedulerException e) {
             log.error("Failed to schedule trial checks: {}", e.getMessage());
@@ -127,7 +133,7 @@ public class SchedulerService {
         }
     }
 
-    private void scheduleTrafficCheckJob(Long userId, java.util.UUID subscriptionUuid, Instant executeAt, String type)
+    private void scheduleTrafficCheckJob(UUID accountId, UUID subscriptionUuid, Instant executeAt, String type)
             throws SchedulerException {
 
         String subscriptionId = subscriptionUuid.toString();
@@ -141,7 +147,7 @@ public class SchedulerService {
 
         JobDetail job = JobBuilder.newJob(NoTrialTrafficNotification.class)
                 .withIdentity(jobKey)
-                .usingJobData("userId", userId)
+                .usingJobData("accountId", accountId.toString())
                 .usingJobData("subscriptionId", subscriptionId)
                 .usingJobData("type", type)
                 .storeDurably(false)
@@ -158,12 +164,5 @@ public class SchedulerService {
         log.debug("Scheduled traffic check job {} at {}", jobName, executeAt);
     }
 
-
-    private void checkOwner(Long telegramId, java.util.UUID subscriptionId) {
-        var user = users.findById(telegramId).orElseThrow();
-        var subscription = subscriptions.findById(subscriptionId).orElseThrow();
-        if (!subscription.getAccount().getId().equals(user.getAccount().getId()))
-            throw new IllegalArgumentException("Subscription belongs to another account");
-    }
 
 }
