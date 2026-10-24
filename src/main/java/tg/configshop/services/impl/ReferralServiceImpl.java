@@ -62,6 +62,7 @@ public class ReferralServiceImpl implements ReferralService {
     }
 
     @Override
+    @Transactional
     public void createReferralCode(Long userId) {
         if (promoCodeRepository.findByCode(PROMO_CODE_PREFIX + userId).isPresent()) return;
         promoCodeRepository.save(PromoCode
@@ -86,6 +87,7 @@ public class ReferralServiceImpl implements ReferralService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<String> getReferralPromoCodes(Long userId) {
         return promoCodeRepository.findCodesByReferrer(botUserRepository.getReferenceById(userId).getAccount());
     }

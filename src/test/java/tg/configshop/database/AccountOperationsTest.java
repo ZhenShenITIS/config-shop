@@ -12,6 +12,9 @@ import liquibase.database.DatabaseFactory;
 import liquibase.database.jvm.JdbcConnection;
 import liquibase.resource.ClassLoaderResourceAccessor;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.springframework.context.annotation.*;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -19,8 +22,15 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.orm.jpa.*;
 import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.testcontainers.junit.jupiter.*;
 import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
+import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
+import org.telegram.telegrambots.meta.api.objects.User;
+import org.telegram.telegrambots.meta.api.objects.message.Message;
+import org.telegram.telegrambots.meta.generics.TelegramClient;
 import tg.configshop.constants.*;
 import tg.configshop.dto.WithdrawalContext;
 import tg.configshop.events.PaymentConfirmedEvent;
@@ -33,6 +43,7 @@ import tg.configshop.model.*;
 import tg.configshop.repositories.*;
 import tg.configshop.services.*;
 import tg.configshop.services.impl.*;
+import tg.configshop.telegram.callbacks.impl.referrals.ReferralCallback;
 
 import javax.sql.DataSource;
 import java.math.BigDecimal;
@@ -244,6 +255,51 @@ class AccountOperationsTest {
         assertEquals(PurchaseType.DEVICE, page.getContent().getFirst().getPurchaseType());
         assertEquals(1, bean(ReferralService.class).getReferralsWithProfitAndLevel(20L,0).getTotalElements());
         verifyNoInteractions(bean(PlategaClient.class));
+    }
+
+    @ParameterizedTest @ValueSource(ints = {0, 1, 2})
+    void referralMenuWorksOnVirtualThreadWithoutCallerTransaction(int codeCount) throws Exception {
+        for (int i = 0; i < codeCount; i++) {
+            bean(PromoCodeRepository.class).saveAndFlush(PromoCode.builder().code("REF_TEST_" + i)
+                    .amount(100L).isReferral(true).referrer(buyer.getAccount()).build());
+        }
+        var callback = new ReferralCallback(bean(ReferralService.class), bean(UserService.class));
+        ReflectionTestUtils.setField(callback, "botUsername", "test_bot");
+        var message = mock(Message.class);
+        when(message.getChatId()).thenReturn(10L);
+        when(message.getMessageId()).thenReturn(1);
+        var query = new CallbackQuery();
+        query.setFrom(new User(10L, "Test", false));
+        query.setMessage(message);
+        query.setData(CallbackName.REFERRAL.getCallbackName());
+        var telegram = mock(TelegramClient.class);
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            executor.submit(() -> {
+                assertTrue(Thread.currentThread().isVirtual());
+                assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
+                callback.processCallback(query, telegram);
+            }).get(15, TimeUnit.SECONDS);
+        }
+        var edit = ArgumentCaptor.forClass(EditMessageText.class);
+        verify(telegram).execute(edit.capture());
+        assertEquals("10", edit.getValue().getChatId());
+        assertTrue(edit.getValue().getText().contains("https://t.me/test_bot?start=10"));
+        for (int i = 0; i < codeCount; i++) {
+            assertTrue(edit.getValue().getText().contains("REF_TEST_" + i));
+        }
+        verifyNoInteractions(bean(PlategaClient.class));
+    }
+
+    @Test void referralCodesCanBeCreatedWithoutCallerTransaction() {
+        assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
+        var referrals = bean(ReferralService.class);
+        referrals.createReferralCode(10L);
+        referrals.createReferralCode(10L);
+        bean(PromoCodeService.class).createReferralPromoCode("CUSTOM_REF", 10L);
+        assertEquals(Set.of("REF_10", "CUSTOM_REF"), new HashSet<>(referrals.getReferralPromoCodes(10L)));
+        assertEquals(2, bean(PromoCodeRepository.class).count());
+        assertEquals(buyer.getAccount().getId(), bean(PromoCodeRepository.class)
+                .findByCode("REF_10").orElseThrow().getReferrer().getId());
     }
 
     @org.springframework.boot.test.context.TestConfiguration @EnableTransactionManagement
