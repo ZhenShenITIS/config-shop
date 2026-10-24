@@ -3,7 +3,6 @@ package tg.configshop.external_api.pay;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
-import tg.configshop.external_api.pay.constants.PaymentStatus;
 import tg.configshop.external_api.pay.dto.CreatePaymentRequest;
 import tg.configshop.external_api.pay.dto.CreatePaymentResponse;
 import tg.configshop.external_api.pay.dto.PaymentStatusResponse;
@@ -22,11 +21,10 @@ public class PlategaClientImpl implements PlategaClient {
     }
 
     @Override
-    public PaymentStatus updateStatus(String paymentId) {
-        PaymentStatusResponse response = plategaRestClient.get()
+    public PaymentStatusResponse getPayment(String paymentId) {
+        return plategaRestClient.get()
                 .uri("/transaction/{paymentId}", paymentId)
                 .retrieve()
                 .body(PaymentStatusResponse.class);
-        return response.status();
     }
 }

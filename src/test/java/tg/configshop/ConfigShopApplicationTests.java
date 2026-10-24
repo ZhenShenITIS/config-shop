@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(properties = {
-        "spring.docker.compose.enabled=false", "spring.quartz.auto-startup=false",
+        "spring.docker.compose.enabled=false", "spring.quartz.auto-startup=false", "payments.polling.enabled=false",
         "spring.autoconfigure.exclude=org.telegram.telegrambots.longpolling.starter.TelegramBotStarterConfiguration",
         "TELEGRAM_BOT_USERNAME=test", "TELEGRAM_BOT_TOKEN=test", "TELEGRAM_WEBHOOK_URL=http://localhost",
         "CONFIG_PANEL_API_URL=http://localhost", "CONFIG_PANEL_API_KEY=test", "CONFIG_PANEL_SUB_URL=http://localhost",

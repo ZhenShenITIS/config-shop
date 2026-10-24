@@ -14,6 +14,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -24,6 +25,7 @@ import java.time.format.DateTimeFormatter;
 @Configuration
 @AllArgsConstructor
 @EnableAsync
+@EnableScheduling
 public class SpringConfig {
 
     private static final DateTimeFormatter INSTANT_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")

@@ -55,9 +55,10 @@ class LiquibaseMigrationTest {
                 SELECT count(*) FROM pg_tables WHERE schemaname = 'public'
                 AND tablename NOT IN ('databasechangelog', 'databasechangeloglock')
                 """, Integer.class));
-        assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM databasechangelog", Integer.class));
+        assertEquals(3, jdbc.queryForObject("SELECT count(*) FROM databasechangelog", Integer.class));
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM bot_users", Integer.class));
         assertEntitiesMatchSchema();
+        assertNotNull(jdbc.queryForObject("SELECT indexdef FROM pg_indexes WHERE indexname='platega_payments_pending_idx'", String.class));
     }
 
     @Test
@@ -72,7 +73,7 @@ class LiquibaseMigrationTest {
             liquibase.update(new Contexts(), new LabelExpression());
         }
 
-        assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM databasechangelog", Integer.class));
+        assertEquals(3, jdbc.queryForObject("SELECT count(*) FROM databasechangelog", Integer.class));
         assertEquals("db/changelog/changes/001-initial-schema.sql",
                 jdbc.queryForObject("SELECT filename FROM databasechangelog WHERE id='001-initial-schema'", String.class));
         assertEquals(100L, jdbc.queryForObject("SELECT amount FROM promo_codes", Long.class));

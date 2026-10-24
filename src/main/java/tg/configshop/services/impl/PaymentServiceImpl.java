@@ -6,7 +6,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.http.HttpHeaders;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.client.HttpClientErrorException;
 import tg.configshop.constants.PaymentResult;
 import tg.configshop.constants.TopUpSource;
 import tg.configshop.events.PaymentConfirmedEvent;
@@ -15,6 +20,7 @@ import tg.configshop.external_api.pay.constants.PaymentStatus;
 import tg.configshop.external_api.pay.dto.CreatePaymentRequest;
 import tg.configshop.external_api.pay.dto.CreatePaymentResponse;
 import tg.configshop.external_api.pay.dto.PaymentDetails;
+import tg.configshop.external_api.pay.dto.PaymentStatusResponse;
 import tg.configshop.external_api.pay.model.PlategaPayment;
 import tg.configshop.external_api.pay.repositories.PlategaPaymentRepository;
 import tg.configshop.model.TopUp;
@@ -23,6 +29,12 @@ import tg.configshop.services.PaymentService;
 import tg.configshop.services.AccountService;
 import tg.configshop.dto.PaymentView;
 import tg.configshop.dto.PaymentLimits;
+
+import java.time.Instant;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -34,6 +46,8 @@ public class PaymentServiceImpl implements PaymentService {
     private final BalanceService balanceService;
     private final TopUpRepository topUpRepository;
     private final ApplicationEventPublisher applicationEventPublisher;
+    private final PlatformTransactionManager transactionManager;
+    private volatile Instant retryStatusAfter = Instant.MIN;
 
     @Override public PaymentLimits limits() { return new PaymentLimits(100, 10000); }
 
@@ -76,48 +90,84 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
-    @Transactional
-    public PaymentResult checkPayment(String paymentId, java.util.UUID accountId) {
-        PlategaPayment payment = paymentRepository.findByIdWithLock(paymentId)
-                .orElse(null);
-        if (payment == null) return PaymentResult.MANUAL_REVIEW;
-        if (!payment.getAccount().getId().equals(accountId)) {
-            throw new IllegalArgumentException("Payment belongs to another account");
-        }
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public PaymentResult checkPayment(String paymentId, UUID accountId) {
+        var transaction = new TransactionTemplate(transactionManager);
+        PaymentResult current = transaction.execute(tx -> paymentRepository.findForCheck(paymentId)
+                .map(payment -> currentResult(payment.getId(), payment.getAccountId(), payment.getStatus(), accountId))
+                .orElse(PaymentResult.MANUAL_REVIEW));
+        if (current != PaymentResult.PROCESSING) return current;
+        if (Instant.now().isBefore(retryStatusAfter)) return PaymentResult.PROCESSING;
 
-
-        if (topUpRepository.existsByPlatega_Id(payment.getId())
-                || !PaymentStatus.PENDING.equals(payment.getStatus())) {
-            return PaymentResult.EXPIRED;
-        }
-
-        PaymentStatus remoteStatus;
+        PaymentStatusResponse response;
         try {
-            // TODO remove HTTP-request from @Transactional
-            remoteStatus = plategaClient.updateStatus(paymentId);
+            response = plategaClient.getPayment(paymentId);
+        } catch (HttpClientErrorException.TooManyRequests e) {
+            retryStatusAfter = retryAfter(e.getResponseHeaders());
+            log.warn("Platega status checks paused until {}", retryStatusAfter);
+            return PaymentResult.PROCESSING;
         } catch (Exception e) {
-            log.error("Error fetching status from Platega", e);
+            log.error("Error fetching payment {} from Platega", paymentId, e);
             return PaymentResult.PROCESSING;
         }
 
-        if (payment.getStatus() != remoteStatus) {
-            payment.setStatus(remoteStatus);
-            payment.setUpdatedAt(java.time.Instant.now());
+        return transaction.execute(tx -> {
+            var payment = paymentRepository.findByIdWithLock(paymentId).orElse(null);
+            if (payment == null) return PaymentResult.MANUAL_REVIEW;
+            var result = currentResult(payment.getId(), payment.getAccount().getId(), payment.getStatus(), accountId);
+            if (result != PaymentResult.PROCESSING) return result;
+
+            if (response == null || response.status() == null || !paymentId.equals(response.id())
+                    || response.paymentDetails() == null || response.paymentDetails().amount() == null
+                    || payment.getAmount().compareTo(response.paymentDetails().amount()) != 0
+                    || !payment.getCurrency().equals(response.paymentDetails().currency())
+                    || !"RUB".equals(payment.getCurrency())) {
+                log.error("Invalid Platega response for payment {}", paymentId);
+                return PaymentResult.MANUAL_REVIEW;
+            }
+            if (response.status() == PaymentStatus.PENDING) return PaymentResult.PROCESSING;
+
+            payment.setStatus(response.status());
+            payment.setUpdatedAt(Instant.now());
             paymentRepository.save(payment);
-
-            if (remoteStatus == PaymentStatus.CONFIRMED) {
-                if (!"RUB".equals(payment.getCurrency())) throw new IllegalStateException("Unsupported currency");
+            if (response.status() == PaymentStatus.CONFIRMED) {
                 Long amount = payment.getAmount().longValueExact();
-
                 saveTopUpHistory(amount, payment);
                 applicationEventPublisher.publishEvent(new PaymentConfirmedEvent(accountId, amount, payment.getId()));
-
                 return PaymentResult.CONFIRMED;
-            } else if (remoteStatus == PaymentStatus.CANCELED) {
-                return PaymentResult.CANCELED;
+            }
+            return response.status() == PaymentStatus.CANCELED ? PaymentResult.CANCELED : PaymentResult.MANUAL_REVIEW;
+        });
+    }
+
+    private PaymentResult currentResult(UUID paymentId, UUID ownerId, PaymentStatus status, UUID accountId) {
+        if (!ownerId.equals(accountId)) throw new IllegalArgumentException("Payment belongs to another account");
+        if (status == PaymentStatus.CHARGEBACKED) return PaymentResult.MANUAL_REVIEW;
+        if (topUpRepository.existsByPlatega_Id(paymentId)) {
+            return status == PaymentStatus.PENDING || status == PaymentStatus.CONFIRMED
+                    ? PaymentResult.CONFIRMED : PaymentResult.MANUAL_REVIEW;
+        }
+        return switch (status) {
+            case PENDING -> PaymentResult.PROCESSING;
+            case CANCELED -> PaymentResult.CANCELED;
+            default -> PaymentResult.MANUAL_REVIEW;
+        };
+    }
+
+    private Instant retryAfter(HttpHeaders headers) {
+        String value = headers == null ? null : headers.getFirst(HttpHeaders.RETRY_AFTER);
+        if (value != null) {
+            try {
+                return Instant.now().plusSeconds(Math.max(1, Long.parseLong(value)));
+            } catch (NumberFormatException e) {
+                try {
+                    return ZonedDateTime.parse(value, DateTimeFormatter.RFC_1123_DATE_TIME).toInstant();
+                } catch (DateTimeParseException ignored) {
+                    // Use a short pause if the provider sent an invalid Retry-After value.
+                }
             }
         }
-        return PaymentResult.PROCESSING;
+        return Instant.now().plusSeconds(60);
     }
 
     private void saveTopUpHistory(Long amount, PlategaPayment payment) {

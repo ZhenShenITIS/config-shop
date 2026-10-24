@@ -1,6 +1,7 @@
 package tg.configshop.database;
 
 import tg.configshop.external_api.pay.dto.CreatePaymentResponse;
+import tg.configshop.external_api.pay.dto.PaymentStatusResponse;
 
 import tg.configshop.exceptions.subscription.InsufficientBalanceException;
 import tg.configshop.exceptions.promocode.PromoCodeEndedException;
@@ -14,15 +15,23 @@ import liquibase.resource.ClassLoaderResourceAccessor;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.context.annotation.*;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.orm.jpa.*;
 import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.testcontainers.junit.jupiter.*;
 import org.testcontainers.postgresql.PostgreSQLContainer;
@@ -48,8 +57,13 @@ import tg.configshop.telegram.callbacks.impl.referrals.ReferralCallback;
 
 import javax.sql.DataSource;
 import java.math.BigDecimal;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -160,6 +174,10 @@ class AccountOperationsTest {
                 .account(user.getAccount()).transactionId(id).amount(new BigDecimal("1000.00"))
                 .currency("RUB").paymentMethod(PaymentMethod.SBP).status(PaymentStatus.PENDING).build());
     }
+    private static PaymentStatusResponse confirmedPayment(String id) {
+        return new PaymentStatusResponse(id, PaymentStatus.CONFIRMED,
+                new PaymentStatusResponse.Details(new BigDecimal("1000"), "RUB"));
+    }
     @Test void newPaymentsPersistOwnerAndSeparateProviderId() {
         when(bean(PlategaClient.class).createPayment(any())).thenReturn(
             new CreatePaymentResponse("provider-id",PaymentMethod.SBP,"https://example.invalid/pay",
@@ -176,9 +194,9 @@ class AccountOperationsTest {
         var referrals = bean(ReferralService.class);
         referrals.createReferral(accountId(20), accountId(10)); referrals.createReferral(accountId(30), accountId(20)); referrals.createReferral(accountId(40), accountId(30));
         var p = payment(buyer, "payment");
-        when(bean(PlategaClient.class).updateStatus("payment")).thenReturn(PaymentStatus.CONFIRMED);
+        when(bean(PlategaClient.class).getPayment("payment")).thenReturn(confirmedPayment("payment"));
         assertEquals(PaymentResult.CONFIRMED, bean(PaymentService.class).checkPayment("payment", accountId(10)));
-        assertEquals(PaymentResult.EXPIRED, bean(PaymentService.class).checkPayment("payment", accountId(10)));
+        assertEquals(PaymentResult.CONFIRMED, bean(PaymentService.class).checkPayment("payment", accountId(10)));
         context.publishEvent(new PaymentConfirmedEvent(accountId(10), 1000L, p.getId()));
         assertEquals(1000, balance.balance(buyer.getAccount().getId()));
         assertEquals(350, balance.balance(first.getAccount().getId()));
@@ -199,16 +217,209 @@ class AccountOperationsTest {
         var p = payment(buyer, "old-credited");
         balance.credit(TopUp.builder().account(buyer.getAccount()).value(1000L)
                 .topUpSource(TopUpSource.EXTERNAL).platega(p).build());
-        assertEquals(PaymentResult.EXPIRED, bean(PaymentService.class).checkPayment("old-credited", accountId(10)));
+        assertEquals(PaymentResult.CONFIRMED, bean(PaymentService.class).checkPayment("old-credited", accountId(10)));
         assertEquals(1000, balance.balance(buyer.getAccount().getId()));
         assertEquals(1, bean(BalanceLogRepository.class).count());
         assertEquals(PaymentStatus.PENDING, bean(PlategaPaymentRepository.class).findById(p.getId()).orElseThrow().getStatus());
+        bean(PaymentPollingService.class).checkPendingPayments();
         verifyNoInteractions(bean(PlategaClient.class));
     }
+    @Test void providerRequestRunsWithoutTransactionOrPaymentLockEvenForTransactionalCaller() {
+        payment(buyer, "outside-transaction");
+        UUID owner = buyer.getAccount().getId();
+        var events = new AtomicInteger();
+        context.addApplicationListener(event -> {
+            if (event instanceof org.springframework.context.PayloadApplicationEvent<?> payload
+                    && payload.getPayload() instanceof PaymentConfirmedEvent) {
+                assertTrue(TransactionSynchronizationManager.isActualTransactionActive());
+                events.incrementAndGet();
+            }
+        });
+        when(bean(PlategaClient.class).getPayment("outside-transaction")).thenAnswer(invocation -> {
+            assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
+            assertEquals("outside-transaction", jdbc.queryForObject(
+                    "SELECT provider_payment_id FROM platega_payments WHERE provider_payment_id=? FOR UPDATE NOWAIT",
+                    String.class, "outside-transaction"));
+            return confirmedPayment("outside-transaction");
+        });
+        new TransactionTemplate(bean(PlatformTransactionManager.class)).execute(tx -> {
+            assertEquals(PaymentResult.CONFIRMED, bean(PaymentService.class).checkPayment("outside-transaction", owner));
+            assertTrue(TransactionSynchronizationManager.isActualTransactionActive());
+            return null;
+        });
+        assertEquals(1000, balance.balance(owner));
+        assertEquals(1, events.get());
+    }
+
+    @Test void concurrentManualAndBackgroundChecksCreditPaymentAndReferralsOnce() throws Exception {
+        var referrer = user(20);
+        UUID owner = buyer.getAccount().getId();
+        bean(ReferralService.class).createReferral(referrer.getAccount().getId(), owner);
+        payment(buyer, "concurrent-payment");
+        var bothRequests = new CyclicBarrier(2);
+        var events = new AtomicInteger();
+        context.addApplicationListener(event -> {
+            if (event instanceof org.springframework.context.PayloadApplicationEvent<?> payload
+                    && payload.getPayload() instanceof PaymentConfirmedEvent) events.incrementAndGet();
+        });
+        when(bean(PlategaClient.class).getPayment("concurrent-payment")).thenAnswer(invocation -> {
+            bothRequests.await(10, TimeUnit.SECONDS);
+            return confirmedPayment("concurrent-payment");
+        });
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            var manual = pool.submit(() -> bean(PaymentService.class).checkPayment("concurrent-payment", owner));
+            var background = pool.submit(() -> bean(PaymentPollingService.class).checkPendingPayments());
+            assertEquals(PaymentResult.CONFIRMED, manual.get(15, TimeUnit.SECONDS));
+            background.get(15, TimeUnit.SECONDS);
+        }
+        assertEquals(1000, balance.balance(owner));
+        assertEquals(350, balance.balance(referrer.getAccount().getId()));
+        assertEquals(2, bean(TopUpRepository.class).count());
+        assertEquals(2, bean(BalanceLogRepository.class).count());
+        assertEquals(1, events.get());
+    }
+
+    @Test void latePendingResponseDoesNotOverwriteConfirmedPayment() throws Exception {
+        var payment = payment(buyer, "late-pending");
+        UUID owner = buyer.getAccount().getId();
+        var pendingStarted = new CountDownLatch(1);
+        var releasePending = new CountDownLatch(1);
+        var calls = new AtomicInteger();
+        when(bean(PlategaClient.class).getPayment("late-pending")).thenAnswer(invocation -> {
+            if (calls.getAndIncrement() == 0) {
+                pendingStarted.countDown();
+                assertTrue(releasePending.await(10, TimeUnit.SECONDS));
+                return new PaymentStatusResponse("late-pending", PaymentStatus.PENDING, confirmedPayment("late-pending").paymentDetails());
+            }
+            return confirmedPayment("late-pending");
+        });
+        try (var pool = Executors.newSingleThreadExecutor()) {
+            var late = pool.submit(() -> bean(PaymentService.class).checkPayment("late-pending", owner));
+            try {
+                assertTrue(pendingStarted.await(10, TimeUnit.SECONDS));
+                assertEquals(PaymentResult.CONFIRMED, bean(PaymentService.class).checkPayment("late-pending", owner));
+            } finally {
+                releasePending.countDown();
+            }
+            assertEquals(PaymentResult.CONFIRMED, late.get(15, TimeUnit.SECONDS));
+        }
+        assertEquals(PaymentStatus.CONFIRMED, bean(PlategaPaymentRepository.class).findById(payment.getId()).orElseThrow().getStatus());
+        assertEquals(1000, balance.balance(owner));
+        assertEquals(1, bean(BalanceLogRepository.class).count());
+    }
+
+    static Stream<PaymentStatusResponse> invalidPaymentResponses() {
+        return Stream.of(null,
+                new PaymentStatusResponse("wrong-id", PaymentStatus.CONFIRMED, confirmedPayment("invalid").paymentDetails()),
+                new PaymentStatusResponse("invalid", PaymentStatus.CONFIRMED, new PaymentStatusResponse.Details(new BigDecimal("999"), "RUB")),
+                new PaymentStatusResponse("invalid", PaymentStatus.CONFIRMED, new PaymentStatusResponse.Details(new BigDecimal("1000"), "USD")),
+                new PaymentStatusResponse("invalid", PaymentStatus.CONFIRMED, new PaymentStatusResponse.Details(null, "RUB")),
+                new PaymentStatusResponse("invalid", PaymentStatus.CONFIRMED, null),
+                new PaymentStatusResponse("invalid", null, confirmedPayment("invalid").paymentDetails()));
+    }
+
+    @ParameterizedTest @MethodSource("invalidPaymentResponses")
+    void invalidProviderResponseCannotConfirmOrCreditPayment(PaymentStatusResponse response) {
+        var payment = payment(buyer, "invalid");
+        when(bean(PlategaClient.class).getPayment("invalid")).thenReturn(response);
+        assertEquals(PaymentResult.MANUAL_REVIEW, bean(PaymentService.class).checkPayment("invalid", buyer.getAccount().getId()));
+        assertEquals(PaymentStatus.PENDING, bean(PlategaPaymentRepository.class).findById(payment.getId()).orElseThrow().getStatus());
+        assertEquals(0, bean(TopUpRepository.class).count());
+        assertEquals(0, bean(BalanceLogRepository.class).count());
+    }
+
+    @ParameterizedTest @EnumSource(value = PaymentStatus.class, names = {"CANCELED", "CHARGEBACKED"})
+    void terminalUnpaidStatusIsSavedWithoutCreditAndRepeatedRequest(PaymentStatus status) {
+        var payment = payment(buyer, "unpaid");
+        when(bean(PlategaClient.class).getPayment("unpaid"))
+                .thenReturn(new PaymentStatusResponse("unpaid", status, confirmedPayment("unpaid").paymentDetails()));
+        PaymentResult expected = status == PaymentStatus.CANCELED ? PaymentResult.CANCELED : PaymentResult.MANUAL_REVIEW;
+        assertEquals(expected, bean(PaymentService.class).checkPayment("unpaid", buyer.getAccount().getId()));
+        assertEquals(expected, bean(PaymentService.class).checkPayment("unpaid", buyer.getAccount().getId()));
+        assertEquals(status, bean(PlategaPaymentRepository.class).findById(payment.getId()).orElseThrow().getStatus());
+        assertEquals(0, bean(BalanceLogRepository.class).count());
+        verify(bean(PlategaClient.class)).getPayment("unpaid");
+    }
+
+    @Test void pollingContinuesAfterProviderFailureAndRetriesUnfinishedPaymentFromDatabase() {
+        payment(buyer, "failed-request");
+        payment(buyer, "still-pending");
+        payment(buyer, "paid-request");
+        var client = bean(PlategaClient.class);
+        when(client.getPayment("failed-request")).thenThrow(new ResourceAccessException("timeout"))
+                .thenReturn(confirmedPayment("failed-request"));
+        when(client.getPayment("still-pending")).thenReturn(new PaymentStatusResponse(
+                "still-pending", PaymentStatus.PENDING, confirmedPayment("still-pending").paymentDetails()));
+        when(client.getPayment("paid-request")).thenReturn(confirmedPayment("paid-request"));
+        bean(PaymentPollingService.class).checkPendingPayments();
+        assertEquals(1000, balance.balance(buyer.getAccount().getId()));
+        new PaymentPollingService(bean(PlategaPaymentRepository.class), bean(PaymentService.class)).checkPendingPayments();
+        assertEquals(2000, balance.balance(buyer.getAccount().getId()));
+        assertEquals(2, bean(BalanceLogRepository.class).count());
+        verify(client, times(2)).getPayment("failed-request");
+        verify(client, times(2)).getPayment("still-pending");
+        verify(client).getPayment("paid-request");
+    }
+
+    @Test void pollingDoesNotSkipPaymentsWhenConfirmedRowsDisappearBetweenPages() {
+        jdbc.update("""
+                INSERT INTO platega_payments(provider_payment_id, account_id, amount, currency, status, payment_method, created_at)
+                SELECT 'paged-' || n, ?, 1000, 'RUB', 'PENDING', 'SBPQR', '2026-01-01T00:00:00Z'
+                FROM generate_series(1, 105) n
+                """, buyer.getAccount().getId());
+        when(bean(PlategaClient.class).getPayment(startsWith("paged-")))
+                .thenAnswer(invocation -> confirmedPayment(invocation.getArgument(0)));
+        bean(PaymentPollingService.class).checkPendingPayments();
+        assertEquals(105000, balance.balance(buyer.getAccount().getId()));
+        assertEquals(105, bean(TopUpRepository.class).count());
+        assertEquals(105, bean(BalanceLogRepository.class).count());
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM platega_payments WHERE status='PENDING'", Integer.class));
+        verify(bean(PlategaClient.class), times(105)).getPayment(anyString());
+    }
+
+    @Test void failedSettlementDoesNotStopPollingAndIsRetriedOnNextRun() {
+        var failed = payment(buyer, "failed-settlement");
+        payment(buyer, "successful-settlement");
+        var failOnce = new AtomicBoolean(true);
+        context.addApplicationListener(event -> {
+            if (event instanceof org.springframework.context.PayloadApplicationEvent<?> payload
+                    && payload.getPayload() instanceof PaymentConfirmedEvent confirmed
+                    && confirmed.paymentId().equals(failed.getId()) && failOnce.getAndSet(false)) {
+                throw new IllegalStateException("settlement failure");
+            }
+        });
+        when(bean(PlategaClient.class).getPayment(anyString()))
+                .thenAnswer(invocation -> confirmedPayment(invocation.getArgument(0)));
+        bean(PaymentPollingService.class).checkPendingPayments();
+        assertEquals(1000, balance.balance(buyer.getAccount().getId()));
+        assertEquals(PaymentStatus.PENDING, bean(PlategaPaymentRepository.class).findById(failed.getId()).orElseThrow().getStatus());
+        assertEquals(1, bean(BalanceLogRepository.class).count());
+        bean(PaymentPollingService.class).checkPendingPayments();
+        assertEquals(2000, balance.balance(buyer.getAccount().getId()));
+        assertEquals(2, bean(TopUpRepository.class).count());
+        assertEquals(2, bean(BalanceLogRepository.class).count());
+    }
+
+    @ParameterizedTest @ValueSource(strings = {"120", "date", "invalid"})
+    void rateLimitPausesBothManualAndBackgroundProviderRequests(String retryAfter) {
+        payment(buyer, "rate-limited");
+        var headers = new HttpHeaders();
+        headers.set(HttpHeaders.RETRY_AFTER, retryAfter.equals("date")
+                ? ZonedDateTime.now(java.time.ZoneOffset.UTC).plusMinutes(2).format(DateTimeFormatter.RFC_1123_DATE_TIME) : retryAfter);
+        when(bean(PlategaClient.class).getPayment("rate-limited")).thenThrow(HttpClientErrorException.create(
+                HttpStatus.TOO_MANY_REQUESTS, "rate limited", headers, new byte[0], java.nio.charset.StandardCharsets.UTF_8));
+        assertEquals(PaymentResult.PROCESSING, bean(PaymentService.class).checkPayment("rate-limited", buyer.getAccount().getId()));
+        bean(PaymentPollingService.class).checkPendingPayments();
+        assertEquals(PaymentResult.PROCESSING, bean(PaymentService.class).checkPayment("rate-limited", buyer.getAccount().getId()));
+        verify(bean(PlategaClient.class)).getPayment("rate-limited");
+        assertEquals(0, bean(BalanceLogRepository.class).count());
+    }
+
     @Test void fractionalPaymentDoesNotTruncateOrPartiallyConfirm() {
         var p = payment(buyer, "fractional"); p.setAmount(new BigDecimal("1000.50"));
         bean(PlategaPaymentRepository.class).saveAndFlush(p);
-        when(bean(PlategaClient.class).updateStatus("fractional")).thenReturn(PaymentStatus.CONFIRMED);
+        when(bean(PlategaClient.class).getPayment("fractional")).thenReturn(new PaymentStatusResponse("fractional", PaymentStatus.CONFIRMED,
+                new PaymentStatusResponse.Details(new BigDecimal("1000.50"), "RUB")));
         assertThrows(ArithmeticException.class, () -> bean(PaymentService.class).checkPayment("fractional", accountId(10)));
         assertEquals(PaymentStatus.PENDING, bean(PlategaPaymentRepository.class).findById(p.getId()).orElseThrow().getStatus());
         assertEquals(0, bean(BalanceLogRepository.class).count());
@@ -332,7 +543,8 @@ class AccountOperationsTest {
         var payment = bean(PlategaPaymentRepository.class).saveAndFlush(PlategaPayment.builder()
                 .account(accounts.requireAccount(payer)).transactionId("web-payment").amount(new BigDecimal("1000"))
                 .currency("RUB").paymentMethod(PaymentMethod.SBP).status(PaymentStatus.PENDING).build());
-        when(bean(PlategaClient.class).updateStatus("web-payment")).thenReturn(PaymentStatus.CONFIRMED);
+        when(bean(PlategaClient.class).getPayment("web-payment")).thenReturn(confirmedPayment("web-payment"));
+        bean(PaymentPollingService.class).checkPendingPayments();
         assertEquals(PaymentResult.CONFIRMED, bean(PaymentService.class).checkPayment("web-payment", payer));
         context.publishEvent(new PaymentConfirmedEvent(payer, 1000, payment.getId()));
         assertEquals(1000, balance.balance(payer)); assertEquals(350, balance.balance(first));
@@ -422,21 +634,27 @@ class AccountOperationsTest {
         var payment=bean(PlategaPaymentRepository.class).saveAndFlush(PlategaPayment.builder()
                 .account(bean(AccountService.class).requireAccount(payer)).transactionId("rollback-payment")
                 .amount(new BigDecimal("1000")).currency("RUB").paymentMethod(PaymentMethod.SBP).status(PaymentStatus.PENDING).build());
-        when(bean(PlategaClient.class).updateStatus("rollback-payment")).thenReturn(PaymentStatus.CONFIRMED);
+        when(bean(PlategaClient.class).getPayment("rollback-payment")).thenReturn(confirmedPayment("rollback-payment"));
+        var failOnce = new AtomicBoolean(true);
         context.addApplicationListener(event -> {
             if(event instanceof org.springframework.context.PayloadApplicationEvent<?> payload
-                    && payload.getPayload() instanceof tg.configshop.events.ReferralRewardEvent) throw new IllegalStateException("test failure");
+                    && payload.getPayload() instanceof tg.configshop.events.ReferralRewardEvent
+                    && failOnce.getAndSet(false)) throw new IllegalStateException("test failure");
         });
         assertThrows(IllegalStateException.class, () -> bean(PaymentService.class).checkPayment("rollback-payment",payer));
         assertEquals(PaymentStatus.PENDING,bean(PlategaPaymentRepository.class).findById(payment.getId()).orElseThrow().getStatus());
         assertEquals(0,balance.balance(payer)); assertEquals(0,balance.balance(referrer));
         assertEquals(0,bean(TopUpRepository.class).count()); assertEquals(0,bean(BalanceLogRepository.class).count());
+        bean(PaymentPollingService.class).checkPendingPayments();
+        assertEquals(PaymentStatus.CONFIRMED,bean(PlategaPaymentRepository.class).findById(payment.getId()).orElseThrow().getStatus());
+        assertEquals(1000,balance.balance(payer)); assertEquals(350,balance.balance(referrer));
+        assertEquals(2,bean(TopUpRepository.class).count()); assertEquals(2,bean(BalanceLogRepository.class).count());
     }
 
     @org.springframework.boot.test.context.TestConfiguration @EnableTransactionManagement
     @EnableJpaRepositories(basePackages = {"tg.configshop.repositories", "tg.configshop.external_api.pay.repositories"})
     @Import({BalanceServiceImpl.class, AccountService.class, SubscriptionAccessService.class, ReferralServiceImpl.class, PromoCodeServiceImpl.class,
-            WithdrawalService.class, PaymentServiceImpl.class, PaymentConfirmedListener.class, OperationsService.class,
+            WithdrawalService.class, PaymentServiceImpl.class, PaymentPollingService.class, PaymentConfirmedListener.class, OperationsService.class,
             SubscriptionServiceImpl.class, TrafficPackageServiceImpl.class, DeviceService.class, DevicePurchaseService.class,
             ExternalSubscriptionService.class, RegistrationServiceImpl.class, tg.configshop.listeners.RemnawaveEventListener.class})
     static class Config {
