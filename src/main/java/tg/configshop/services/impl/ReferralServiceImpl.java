@@ -97,7 +97,7 @@ public class ReferralServiceImpl implements ReferralService {
         long theoreticalReferralBalance = Math.max(0, totalReferralEarnings - totalWithdrawnOrPending);
 
         long currentWalletBalance = balanceService.balance(botUserRepository.findById(userId).orElseThrow().getAccount().getId());
-        return Math.min(theoreticalReferralBalance, currentWalletBalance);
+        return Math.max(0, Math.min(theoreticalReferralBalance, currentWalletBalance));
     }
 
     @Override

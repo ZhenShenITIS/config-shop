@@ -81,6 +81,33 @@ class AccountOperationsTest {
         return Purchase.builder().account(user.getAccount()).remnawaveSubscription(user.getSubscription())
                 .paidAmount(amount).purchaseType(PurchaseType.DEVICE).deviceCount(1).build();
     }
+    @Test void adminCorrectionsCanOverdrawAndRestoreBalance() {
+        var users = bean(UserService.class);
+        users.addToBalanceAsAdminTopUp(10L, 100L);
+        users.addToBalanceAsAdminTopUp(10L, -150L);
+        assertEquals(-50, users.getBalance(10L));
+        users.addToBalanceAsAdminTopUp(10L, -25L);
+        assertEquals(-75, users.getBalance(10L));
+        assertEquals(0L, bean(ReferralService.class).getAvailableSumToWithdraw(10L));
+        assertThrows(tg.configshop.exceptions.subscription.InsufficientBalanceException.class,
+                () -> balance.purchase(purchase(buyer, 1)));
+        users.addToBalanceAsAdminTopUp(10L, 125L);
+        assertEquals(50, users.getBalance(10L));
+        assertEquals(List.of(-150L, -25L, 100L, 125L), jdbc.queryForList(
+                "select amount from balance_log where type='ADMIN' order by amount", Long.class));
+        assertEquals(4, bean(TopUpRepository.class).count());
+        assertEquals(4, bean(BalanceLogRepository.class).count());
+        assertEquals(0, bean(PurchaseRepository.class).count());
+    }
+    @Test void negativeNonAdminCreditsAreRejected() {
+        for (var source : List.of(TopUpSource.EXTERNAL, TopUpSource.PROMO_CODE, TopUpSource.REFERRAL)) {
+            assertThrows(IllegalArgumentException.class, () -> balance.credit(TopUp.builder()
+                    .account(buyer.getAccount()).value(-100L).topUpSource(source).build()));
+        }
+        assertEquals(0, balance.balance(buyer.getAccount().getId()));
+        assertEquals(0, bean(TopUpRepository.class).count());
+        assertEquals(0, bean(BalanceLogRepository.class).count());
+    }
     @Test void recordsSourcesOnceAndRejectsForeignSubscription() {
         credit(buyer, 100);
         var p = purchase(buyer, 30);

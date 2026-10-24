@@ -29,7 +29,6 @@ public class BalanceServiceImpl implements BalanceService {
         if (topUp.getId() != null && log.existsByTopUp_Id(topUp.getId())) return;
         if (topUp.getValue() <= 0 && topUp.getTopUpSource() != TopUpSource.ADMIN)
             throw new IllegalArgumentException("Non-positive credit");
-        if (topUp.getValue() < 0) checkFunds(topUp.getAccount(), Math.negateExact(topUp.getValue()));
         topUps.saveAndFlush(topUp);
         BalanceLogType type = switch (topUp.getTopUpSource()) {
             case ADMIN -> BalanceLogType.ADMIN;
