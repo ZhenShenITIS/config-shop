@@ -21,6 +21,9 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import java.sql.Connection;
 import java.util.Map;
+import java.util.UUID;
+
+import org.springframework.dao.DataIntegrityViolationException;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -51,11 +54,11 @@ class LiquibaseMigrationTest {
             liquibase.update(new Contexts(), new LabelExpression());
         }
 
-        assertEquals(34, jdbc.queryForObject("""
+        assertEquals(36, jdbc.queryForObject("""
                 SELECT count(*) FROM pg_tables WHERE schemaname = 'public'
                 AND tablename NOT IN ('databasechangelog', 'databasechangeloglock')
                 """, Integer.class));
-        assertEquals(3, jdbc.queryForObject("SELECT count(*) FROM databasechangelog", Integer.class));
+        assertEquals(4, jdbc.queryForObject("SELECT count(*) FROM databasechangelog", Integer.class));
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM bot_users", Integer.class));
         assertEntitiesMatchSchema();
         assertNotNull(jdbc.queryForObject("SELECT indexdef FROM pg_indexes WHERE indexname='platega_payments_pending_idx'", String.class));
@@ -73,7 +76,7 @@ class LiquibaseMigrationTest {
             liquibase.update(new Contexts(), new LabelExpression());
         }
 
-        assertEquals(3, jdbc.queryForObject("SELECT count(*) FROM databasechangelog", Integer.class));
+        assertEquals(4, jdbc.queryForObject("SELECT count(*) FROM databasechangelog", Integer.class));
         assertEquals("db/changelog/changes/001-initial-schema.sql",
                 jdbc.queryForObject("SELECT filename FROM databasechangelog WHERE id='001-initial-schema'", String.class));
         assertEquals(100L, jdbc.queryForObject("SELECT amount FROM promo_codes", Long.class));
@@ -81,6 +84,61 @@ class LiquibaseMigrationTest {
                 "INSERT INTO old_promo_codes (code) VALUES ('AFTER_SYNC') RETURNING id", Long.class));
         assertNotNull(jdbc.queryForObject("INSERT INTO promo_codes(code,amount) VALUES ('NEW',100) RETURNING id", java.util.UUID.class));
         assertEntitiesMatchSchema();
+    }
+
+    @Test
+    void upgradesAccountSchemaAndEnforcesWebAuthConstraints() throws Exception {
+        try (Liquibase lb = liquibase(MASTER)) {
+            lb.update(3, new Contexts(), new LabelExpression());
+        }
+        UUID accountId = jdbc.queryForObject("INSERT INTO accounts DEFAULT VALUES RETURNING id", UUID.class);
+        jdbc.update("INSERT INTO bot_users(telegram_id,account_id) VALUES(?,?)", 42L, accountId);
+        try (Liquibase lb = liquibase(MASTER)) {
+            lb.update(new Contexts(), new LabelExpression());
+            lb.update(new Contexts(), new LabelExpression());
+        }
+        assertEquals(accountId, jdbc.queryForObject("SELECT account_id FROM bot_users WHERE telegram_id=42", UUID.class));
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM accounts", Integer.class));
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM web_users", Integer.class));
+        UUID userId = insertWebUser(accountId, "User@example.com");
+        assertNull(jdbc.queryForObject("SELECT email_verified_at FROM web_users WHERE id=?", java.sql.Timestamp.class, userId));
+        UUID otherAccount = jdbc.queryForObject("INSERT INTO accounts DEFAULT VALUES RETURNING id", UUID.class);
+        assertThrows(DataIntegrityViolationException.class, () -> insertWebUser(otherAccount, "user@EXAMPLE.com"));
+        assertThrows(DataIntegrityViolationException.class, () -> insertWebUser(accountId, "other@example.com"));
+        assertThrows(DataIntegrityViolationException.class, () -> insertWebUser(null, "null@example.com"));
+        assertThrows(DataIntegrityViolationException.class, () -> insertWebUser(UUID.randomUUID(), "missing@example.com"));
+
+        UUID familyId = UUID.randomUUID();
+        String hash = "a".repeat(64);
+        UUID tokenId = jdbc.queryForObject("""
+                INSERT INTO web_refresh_tokens(web_user_id,token_hash,family_id,expires_at)
+                VALUES(?,?,?,now()+interval '1 day') RETURNING id
+                """, UUID.class, userId, hash, familyId);
+        assertThrows(DataIntegrityViolationException.class, () -> jdbc.update("""
+                INSERT INTO web_refresh_tokens(web_user_id,token_hash,family_id,expires_at)
+                VALUES(?,?,?,now()+interval '1 day')
+                """, userId, hash, familyId));
+        assertThrows(DataIntegrityViolationException.class, () -> jdbc.update("""
+                INSERT INTO web_refresh_tokens(web_user_id,token_hash,family_id,expires_at)
+                VALUES(?,?,?,now()+interval '1 day')
+                """, UUID.randomUUID(), "b".repeat(64), familyId));
+        assertThrows(DataIntegrityViolationException.class, () -> jdbc.update(
+                "UPDATE web_refresh_tokens SET expires_at=created_at WHERE id=?", tokenId));
+        assertThrows(DataIntegrityViolationException.class, () -> jdbc.update(
+                "UPDATE web_refresh_tokens SET used_at=created_at-interval '1 second' WHERE id=?", tokenId));
+        assertThrows(DataIntegrityViolationException.class, () -> jdbc.update(
+                "UPDATE web_refresh_tokens SET revoked_at=created_at-interval '1 second' WHERE id=?", tokenId));
+        assertThrows(DataIntegrityViolationException.class, () -> jdbc.update(
+                "UPDATE web_refresh_tokens SET replaced_by_id=? WHERE id=?", UUID.randomUUID(), tokenId));
+        assertThrows(DataIntegrityViolationException.class, () -> jdbc.update(
+                "UPDATE web_refresh_tokens SET replaced_by_id=id WHERE id=?", tokenId));
+        assertEntitiesMatchSchema();
+    }
+
+    private UUID insertWebUser(UUID accountId, String email) {
+        return jdbc.queryForObject("""
+                INSERT INTO web_users(account_id,email,password_hash) VALUES(?,?,?) RETURNING id
+                """, UUID.class, accountId, email, "{bcrypt}test");
     }
 
     @Test
