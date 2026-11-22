@@ -15,6 +15,7 @@ public interface PromoCodeRepository extends JpaRepository<PromoCode, UUID> {
     List<PromoCode> findAllByReferrer(Account referrer);
 
     Optional<PromoCode> findByCode(String code);
+    Optional<PromoCode> findByCodeIgnoreCase(String code);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT p FROM PromoCode p WHERE p.code = :code")

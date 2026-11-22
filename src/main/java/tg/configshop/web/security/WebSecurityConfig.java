@@ -73,7 +73,10 @@ public class WebSecurityConfig {
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable)
-                .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/confirm-email",
+                                "/api/auth/resend-confirmation").permitAll()
+                        .anyRequest().authenticated())
                 .exceptionHandling(errors -> errors.authenticationEntryPoint(UNAUTHORIZED).accessDeniedHandler(FORBIDDEN))
                 .oauth2ResourceServer(resource -> resource
                         .authenticationEntryPoint(UNAUTHORIZED).accessDeniedHandler(FORBIDDEN)

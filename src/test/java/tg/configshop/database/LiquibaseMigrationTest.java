@@ -54,11 +54,11 @@ class LiquibaseMigrationTest {
             liquibase.update(new Contexts(), new LabelExpression());
         }
 
-        assertEquals(36, jdbc.queryForObject("""
+        assertEquals(37, jdbc.queryForObject("""
                 SELECT count(*) FROM pg_tables WHERE schemaname = 'public'
                 AND tablename NOT IN ('databasechangelog', 'databasechangeloglock')
                 """, Integer.class));
-        assertEquals(4, jdbc.queryForObject("SELECT count(*) FROM databasechangelog", Integer.class));
+        assertEquals(5, jdbc.queryForObject("SELECT count(*) FROM databasechangelog", Integer.class));
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM bot_users", Integer.class));
         assertEntitiesMatchSchema();
         assertNotNull(jdbc.queryForObject("SELECT indexdef FROM pg_indexes WHERE indexname='platega_payments_pending_idx'", String.class));
@@ -76,7 +76,7 @@ class LiquibaseMigrationTest {
             liquibase.update(new Contexts(), new LabelExpression());
         }
 
-        assertEquals(4, jdbc.queryForObject("SELECT count(*) FROM databasechangelog", Integer.class));
+        assertEquals(5, jdbc.queryForObject("SELECT count(*) FROM databasechangelog", Integer.class));
         assertEquals("db/changelog/changes/001-initial-schema.sql",
                 jdbc.queryForObject("SELECT filename FROM databasechangelog WHERE id='001-initial-schema'", String.class));
         assertEquals(100L, jdbc.queryForObject("SELECT amount FROM promo_codes", Long.class));
@@ -132,6 +132,37 @@ class LiquibaseMigrationTest {
                 "UPDATE web_refresh_tokens SET replaced_by_id=? WHERE id=?", UUID.randomUUID(), tokenId));
         assertThrows(DataIntegrityViolationException.class, () -> jdbc.update(
                 "UPDATE web_refresh_tokens SET replaced_by_id=id WHERE id=?", tokenId));
+        assertEntitiesMatchSchema();
+    }
+
+    @Test
+    void upgradesExistingWebProfilesAndEnforcesConfirmationConstraints() throws Exception {
+        try (Liquibase lb = liquibase(MASTER)) {
+            lb.update(4, new Contexts(), new LabelExpression());
+        }
+        UUID accountId = jdbc.queryForObject("INSERT INTO accounts DEFAULT VALUES RETURNING id", UUID.class);
+        UUID userId = insertWebUser(accountId, "user@example.com");
+        try (Liquibase lb = liquibase(MASTER)) {
+            lb.update(new Contexts(), new LabelExpression());
+            lb.update(new Contexts(), new LabelExpression());
+        }
+        assertEquals(accountId, jdbc.queryForObject("SELECT account_id FROM web_users WHERE id=?", UUID.class, userId));
+        UUID confirmationId = jdbc.queryForObject("""
+                INSERT INTO email_confirmations(web_user_id,token_hash,referrer_account_id,expires_at)
+                VALUES(?,?,?,now()+interval '1 day') RETURNING id
+                """, UUID.class, userId, "a".repeat(64), accountId);
+        assertThrows(DataIntegrityViolationException.class, () -> jdbc.update("""
+                INSERT INTO email_confirmations(web_user_id,token_hash,expires_at)
+                VALUES(?,?,now()+interval '1 day')
+                """, userId, "a".repeat(64)));
+        assertThrows(DataIntegrityViolationException.class, () -> jdbc.update(
+                "UPDATE email_confirmations SET web_user_id=? WHERE id=?", UUID.randomUUID(), confirmationId));
+        assertThrows(DataIntegrityViolationException.class, () -> jdbc.update(
+                "UPDATE email_confirmations SET referrer_account_id=? WHERE id=?", UUID.randomUUID(), confirmationId));
+        assertThrows(DataIntegrityViolationException.class, () -> jdbc.update(
+                "UPDATE email_confirmations SET expires_at=created_at WHERE id=?", confirmationId));
+        assertThrows(DataIntegrityViolationException.class, () -> jdbc.update(
+                "UPDATE email_confirmations SET used_at=created_at-interval '1 second' WHERE id=?", confirmationId));
         assertEntitiesMatchSchema();
     }
 

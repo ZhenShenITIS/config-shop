@@ -7,6 +7,7 @@ import tg.configshop.model.RemnawaveSubscription;
 import java.util.*;
 public interface RemnawaveSubscriptionRepository extends JpaRepository<RemnawaveSubscription, UUID> {
     List<RemnawaveSubscription> findByAccount_IdOrderByCreatedAtAscIdAsc(UUID accountId);
+    boolean existsByAccount_Id(UUID accountId);
     Optional<RemnawaveSubscription> findByIdAndAccount_Id(UUID subscriptionId, UUID accountId);
     List<RemnawaveSubscription> findAllByRemnawaveIdIsNullOrderByIdAsc();
     long countByRemnawaveIdIsNull();

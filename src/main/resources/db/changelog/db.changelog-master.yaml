@@ -7,3 +7,5 @@ databaseChangeLog:
       file: db/changelog/changes/003-pending-payments-index.sql
   - include:
       file: db/changelog/changes/004-web-auth.sql
+  - include:
+      file: db/changelog/changes/005-email-confirmations.sql
