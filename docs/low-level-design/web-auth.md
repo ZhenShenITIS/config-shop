@@ -60,9 +60,45 @@ API на одном HTTPS-адресе, чтобы браузер отправл
 `X-Telegram-Bot-Api-Secret-Token`. Приложение регистрирует его в Telegram при
 запуске на основе действующего `TELEGRAM_BOT_TOKEN`.
 
-Страница `/link-telegram.html` доступна по адресу приложения. Войдите под
+Страница `/link-telegram.html` доступна по адресу сайта. Войдите под
 подтверждённым веб-профилем, чтобы получить шестизначный код на 5 минут.
 Введите код в личном чате с ботом через кнопку «Подключить сайт».
+
+## Публикация сайта
+
+Фронтенд и API доступны по одному HTTPS-домену. В `.env` приложения укажите:
+
+```dotenv
+WEB_AUTH_CONFIRMATION_URL=https://crumpapp.xyz/confirm-email
+WEB_AUTH_PASSWORD_RESET_URL=https://crumpapp.xyz/reset-password
+```
+
+После первого деплоя `web` добавьте в существующий `server` домена
+`crumpapp.xyz` в контейнере внешнего nginx:
+
+```nginx
+# Docker DNS. Он повторно разрешит имя после пересоздания web.
+resolver 127.0.0.11 valid=10s ipv6=off;
+set $config_shop_web http://config-shop-web:80;
+
+location ~ ^/(login|register|dashboard|confirm-email|resend-confirmation|forgot-password|reset-password|link-telegram\.html)?$ {
+    proxy_pass $config_shop_web;
+}
+
+location ^~ /assets/ {
+    proxy_pass $config_shop_web;
+}
+```
+
+Контейнеры внешнего nginx и `web` используют общую `remnawave-network`.
+Если `resolver` уже задан в этом блоке, используйте действующую директиву с Docker DNS.
+Маршрут `/api/` продолжает вести на бэкенд. Для прокси-заголовков API действуют
+настройки из раздела про IP-лимиты. После изменения выполните `nginx -t`,
+перезагрузите nginx и проверьте `/`, `/login` и `/api/me` без JWT.
+
+Для локальной разработки запустите в `frontend/` команды `npm ci` и
+`npm run dev` на Node.js 24. Vite проксирует `/api` на `http://localhost:8443`;
+другой адрес бэкенда задаётся через `VITE_API_PROXY_TARGET`.
 
 ## IP-лимиты за обратным прокси
 

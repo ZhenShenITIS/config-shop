@@ -30,6 +30,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.client.ResourceAccessException;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.User;
@@ -40,6 +41,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import tg.configshop.external_api.remnawave.RemnawaveClient;
 import tg.configshop.external_api.remnawave.dto.user.RemnawaveUserResponse;
+import tg.configshop.external_api.remnawave.dto.user.UserTraffic;
 import tg.configshop.model.Account;
 import tg.configshop.model.EmailConfirmation;
 import tg.configshop.model.PromoCode;
@@ -72,6 +74,8 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.startsWith;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -529,8 +533,6 @@ class WebRegistrationIntegrationTest {
                 """, pendingUser, "e".repeat(64), move);
 
         mvc.perform(post("/api/auth/link-telegram")).andExpect(status().isUnauthorized());
-        mvc.perform(get("/link-telegram.html")).andExpect(status().isOk())
-                .andExpect(content().string(containsString("id=\"generate\"")));
         var session = login("user@example.com", PASSWORD).andExpect(status().isOk()).andReturn().getResponse();
         String accessToken = new ObjectMapper().readTree(session.getContentAsString()).get("accessToken").asText();
         String code = codeFrom(accessToken);
@@ -559,6 +561,12 @@ class WebRegistrationIntegrationTest {
         String newToken = new ObjectMapper().readTree(refreshed.getContentAsString()).get("accessToken").asText();
         mvc.perform(get("/api/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + newToken))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.accountId").value(keep.toString()));
+        mvc.perform(get("/api/me/dashboard").header(HttpHeaders.AUTHORIZATION, "Bearer " + newToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.balance").value(265))
+                .andExpect(jsonPath("$.telegramLinked").value(true))
+                .andExpect(jsonPath("$.subscriptions[*].id")
+                        .value(containsInAnyOrder(telegramSubscription.toString(), webSubscription.toString())));
         mvc.perform(post("/api/auth/link-telegram").header(HttpHeaders.AUTHORIZATION, "Bearer " + newToken))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error").value("telegram_already_linked"))
@@ -566,6 +574,50 @@ class WebRegistrationIntegrationTest {
         assertEquals("telegram_already_linked", assertThrows(WebAuthException.class,
                 () -> telegramLinks.issue(webUser.getId())).getError());
         verifyNoInteractions(remote, scheduler, sender);
+    }
+
+    @Test
+    void onlyReturnsOwnedSubscriptionAndKeepsDashboardAvailableWhenRemnawaveFails() throws Exception {
+        when(clock.instant()).thenReturn(Instant.now());
+        var account = accounts.saveAndFlush(Account.builder().build());
+        var otherAccount = accounts.saveAndFlush(Account.builder().build());
+        var owned = subscriptions.saveAndFlush(RemnawaveSubscription.builder().account(account)
+                .remnawaveId(10L).remnawaveUuid(UUID.randomUUID().toString()).build());
+        var foreign = subscriptions.saveAndFlush(RemnawaveSubscription.builder().account(otherAccount)
+                .remnawaveId(20L).remnawaveUuid(UUID.randomUUID().toString()).build());
+        verifiedWebUser(account.getId(), "dashboard@example.com");
+        var session = login("dashboard@example.com", PASSWORD).andExpect(status().isOk()).andReturn().getResponse();
+        var authorization = "Bearer " + new ObjectMapper().readTree(session.getContentAsString()).get("accessToken").asText();
+        String detailsPath = "/api/me/subscriptions/" + owned.getId();
+
+        mvc.perform(get("/api/me/dashboard")).andExpect(status().isUnauthorized());
+        mvc.perform(get(detailsPath)).andExpect(status().isUnauthorized());
+        for (UUID id : List.of(foreign.getId(), UUID.randomUUID())) {
+            mvc.perform(get("/api/me/subscriptions/" + id).header(HttpHeaders.AUTHORIZATION, authorization))
+                    .andExpect(status().isNotFound()).andExpect(jsonPath("$.error").value("subscription_not_found"));
+        }
+        verifyNoInteractions(remote);
+
+        long gigabyte = 1024L * 1024 * 1024;
+        when(remote.getUser(owned.remnawaveRef())).thenAnswer(invocation -> {
+            assertFalse(TransactionSynchronizationManager.isActualTransactionActive(),
+                    "Remnawave must be called outside a database transaction");
+            throw new ResourceAccessException("timeout");
+        })
+                .thenReturn(RemnawaveUserResponse.builder().id(10L).expireAt(Instant.now().plusSeconds(86400))
+                        .trafficLimitBytes(10 * gigabyte).userTraffic(new UserTraffic(2 * gigabyte, 2 * gigabyte))
+                        .subscriptionUrl("https://example.com/sub").build());
+        mvc.perform(get(detailsPath).header(HttpHeaders.AUTHORIZATION, authorization))
+                .andExpect(status().isServiceUnavailable()).andExpect(jsonPath("$.error").value("subscription_unavailable"));
+        mvc.perform(get("/api/me/dashboard").header(HttpHeaders.AUTHORIZATION, authorization))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.telegramLinked").value(false))
+                .andExpect(jsonPath("$.subscriptions[0].id").value(owned.getId().toString()));
+        mvc.perform(get(detailsPath).header(HttpHeaders.AUTHORIZATION, authorization))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.active").value(true))
+                .andExpect(jsonPath("$.trafficLimitGb").value(10.0))
+                .andExpect(jsonPath("$.usedTrafficGb").value(2.0))
+                .andExpect(jsonPath("$.connectionUrl").value(startsWith("happ://crypt4/")));
     }
 
     @Test

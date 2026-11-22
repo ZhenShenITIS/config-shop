@@ -1,0 +1,14 @@
+**
+!api/
+!api/openapi.yaml
+!frontend/
+!frontend/package.json
+!frontend/package-lock.json
+!frontend/index.html
+!frontend/orval.config.ts
+!frontend/tsconfig.json
+!frontend/vite.config.ts
+!frontend/nginx.conf
+!frontend/src/
+!frontend/src/**
+frontend/src/api/generated

@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import tg.configshop.dto.RemnawaveUser;
 import tg.configshop.dto.UserTrafficInGigabytes;
 import tg.configshop.external_api.remnawave.RemnawaveClient;
+import tg.configshop.external_api.remnawave.dto.user.RemnawaveUserResponse;
 import tg.configshop.util.DateUtil;
 import tg.configshop.util.RsaEncryptor;
 import java.util.Objects;
@@ -23,16 +24,24 @@ public class ExternalSubscriptionService {
     }
     private RemnawaveUser load(UUID accountId, UUID subscriptionId, boolean link, boolean json) {
         var subscription = subscriptions.requireOwned(accountId, subscriptionId);
-        var response = remnawaveClient.getUser(subscription.remnawaveRef());
+        RemnawaveUserResponse response;
+        try {
+            response = remnawaveClient.getUser(subscription.remnawaveRef());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalStateException("Invalid Remnawave reference for subscription " + subscriptionId, e);
+        }
+        if (response == null || response.expireAt() == null)
+            throw new IllegalStateException("Missing Remnawave subscription data for " + subscriptionId);
         if (subscription.getRemnawaveId() != null && !Objects.equals(subscription.getRemnawaveId(), response.id()))
             throw new IllegalStateException("Conflicting Remnawave ID for subscription " + subscriptionId);
         String url = null;
-        if (link) {
+        if (link && response.subscriptionUrl() != null && !response.subscriptionUrl().isBlank()) {
             try { url = RsaEncryptor.encryptAndBuildLink(response.subscriptionUrl() + (json ? "/json" : "")); }
             catch (Exception e) { throw new IllegalStateException("Cannot prepare connection link", e); }
         }
         return RemnawaveUser.builder().expireAt(response.expireAt()).subscriptionUrl(url)
-                .daysLeft(DateUtil.getDaysLeft(response.expireAt())).hwidDeviceLimit(response.hwidDeviceLimit())
+                .daysLeft(DateUtil.getDaysLeft(response.expireAt()))
+                .hwidDeviceLimit(response.hwidDeviceLimit() == null ? 0 : response.hwidDeviceLimit())
                 .userTraffic(response.userTraffic() == null ? new UserTrafficInGigabytes(0, 0) : new UserTrafficInGigabytes(response.userTraffic()))
                 .uuid(response.uuid()).id(response.id()).shortUuid(response.shortUuid()).username(response.username())
                 .trafficLimitGigaBytes(response.trafficLimitBytes() == null ? 0 : response.trafficLimitBytes() / (1024.0 * 1024 * 1024))

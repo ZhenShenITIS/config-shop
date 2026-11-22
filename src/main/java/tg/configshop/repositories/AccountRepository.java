@@ -7,4 +7,10 @@ import java.util.*;
 public interface AccountRepository extends JpaRepository<Account, UUID> {
     @Lock(LockModeType.PESSIMISTIC_WRITE) @Query("select a from Account a where a.id = :id")
     Optional<Account> findByIdWithLock(UUID id);
+
+    @Query(value = """
+            SELECT EXISTS (SELECT 1 FROM bot_users WHERE account_id = :accountId)
+               AND EXISTS (SELECT 1 FROM web_users WHERE account_id = :accountId)
+            """, nativeQuery = true)
+    boolean hasLinkedProfiles(UUID accountId);
 }

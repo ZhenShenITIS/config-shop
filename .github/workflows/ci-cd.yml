@@ -11,93 +11,85 @@ permissions:
 
 concurrency:
   group: config-shop-${{ github.ref }}
-  cancel-in-progress: false
+  queue: max
 
 jobs:
+  changes:
+    name: Detect changed components
+    runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.scope.outputs.app }}
+      web: ${{ steps.scope.outputs.web }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: scope
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: bash scripts/ci-changes.sh "$BASE_SHA" "$HEAD_SHA" "$EVENT_NAME" >> "$GITHUB_OUTPUT"
+
   test:
     name: Build and test
+    needs: changes
+    if: needs.changes.outputs.app == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
           cache: maven
-
       - name: Check Docker for integration tests
         run: docker info > /dev/null
-
       - name: Verify
         run: ./mvnw --batch-mode --no-transfer-progress verify
 
-  deploy:
-    name: Deploy to VM
-    needs: test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/module-arch'
+  test-web:
+    name: Build web
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
 
-      - name: Install password-based SSH client
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends sshpass
+  deploy-app:
+    needs: [changes, test, test-web]
+    if: >-
+      !cancelled() && github.event_name == 'push' &&
+      needs.changes.outputs.app == 'true' && needs.test.result == 'success' &&
+      (needs.changes.outputs.web != 'true' || needs.test-web.result == 'success')
+    uses: ./.github/workflows/deploy-component.yml
+    with:
+      component: app
+    secrets: inherit
 
-      - name: Update and rebuild app over SSH and sudo
-        shell: bash
-        env:
-          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
-          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
-          DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '22' }}
-          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
-          DEPLOY_PASSWORD: ${{ secrets.DEPLOY_PASSWORD }}
-          DEPLOY_SUDO_PASSWORD: ${{ secrets.DEPLOY_SUDO_PASSWORD || secrets.DEPLOY_PASSWORD }}
-          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
-        run: |
-          set -euo pipefail
-          : "${DEPLOY_HOST:?Set the DEPLOY_HOST repository variable}"
-          : "${DEPLOY_USER:?Set the DEPLOY_USER repository variable}"
-          : "${DEPLOY_PATH:?Set the DEPLOY_PATH repository variable}"
-          : "${DEPLOY_PASSWORD:?Set the DEPLOY_PASSWORD repository secret}"
-          : "${DEPLOY_SUDO_PASSWORD:?Set the DEPLOY_SUDO_PASSWORD repository secret}"
-          : "${DEPLOY_KNOWN_HOSTS:?Set the DEPLOY_KNOWN_HOSTS repository secret}"
-
-          umask 077
-          ssh_dir="$RUNNER_TEMP/config-shop-ssh"
-          mkdir -p "$ssh_dir"
-          trap 'rm -f "$ssh_dir/known_hosts"' EXIT
-          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" | tr -d '\r' > "$ssh_dir/known_hosts"
-
-          deploy_command="$(python3 - "$DEPLOY_PATH" "$GITHUB_SHA" "$GITHUB_REF_NAME" <<'PY'
-          import shlex
-          import sys
-          from pathlib import Path
-
-          print(shlex.join([
-              "sudo", "-k", "-S", "-p", "", "-H", "--",
-              "bash", "-c", Path("scripts/deploy.sh").read_text(), "--",
-              *sys.argv[1:],
-          ]))
-          PY
-          )"
-
-          export SSHPASS="$DEPLOY_PASSWORD"
-          printf '%s\n' "$DEPLOY_SUDO_PASSWORD" | sshpass -e ssh -T -F /dev/null \
-            -p "$DEPLOY_PORT" \
-            -o PubkeyAuthentication=no \
-            -o PreferredAuthentications=password,keyboard-interactive \
-            -o NumberOfPasswordPrompts=1 \
-            -o StrictHostKeyChecking=yes \
-            -o UserKnownHostsFile="$ssh_dir/known_hosts" \
-            -o ConnectTimeout=15 \
-            -o ServerAliveInterval=30 \
-            -o ServerAliveCountMax=10 \
-            "$DEPLOY_USER@$DEPLOY_HOST" "$deploy_command"
+  deploy-web:
+    needs: [changes, test-web, deploy-app]
+    if: >-
+      !cancelled() && github.event_name == 'push' &&
+      needs.changes.outputs.web == 'true' && needs.test-web.result == 'success' &&
+      (needs.changes.outputs.app != 'true' || needs.deploy-app.result == 'success')
+    uses: ./.github/workflows/deploy-component.yml
+    with:
+      component: web
+    secrets: inherit

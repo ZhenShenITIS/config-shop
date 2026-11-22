@@ -117,7 +117,6 @@ public class WebSecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers(HttpMethod.POST, "/webhook", "/internal/remnawave/webhook").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/link-telegram.html").permitAll()
                         .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/prometheus", "/actuator/info").permitAll()
                         .anyRequest().denyAll())
                 .exceptionHandling(errors -> errors.authenticationEntryPoint(UNAUTHORIZED).accessDeniedHandler(FORBIDDEN))

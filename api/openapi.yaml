@@ -1,0 +1,247 @@
+openapi: 3.0.3
+info:
+  title: Config Shop Web API
+  version: 1.0.0
+paths:
+  /api/auth/register:
+    post:
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+      responses:
+        '201': { $ref: '#/components/responses/Message' }
+        default: { $ref: '#/components/responses/Error' }
+  /api/auth/confirm-email:
+    post:
+      operationId: confirmEmail
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConfirmationToken' }
+      responses:
+        '200':
+          description: Confirmation result
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Confirmation' }
+        default: { $ref: '#/components/responses/Error' }
+  /api/auth/resend-confirmation:
+    post:
+      operationId: resendConfirmation
+      requestBody:
+        $ref: '#/components/requestBodies/Email'
+      responses:
+        '202': { $ref: '#/components/responses/Message' }
+        default: { $ref: '#/components/responses/Error' }
+  /api/auth/login:
+    post:
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Session' }
+        default: { $ref: '#/components/responses/Error' }
+  /api/auth/refresh:
+    post:
+      operationId: refresh
+      security: [{ refreshCookie: [] }]
+      parameters: [{ $ref: '#/components/parameters/Csrf' }]
+      responses:
+        '200': { $ref: '#/components/responses/Session' }
+        default: { $ref: '#/components/responses/Error' }
+  /api/auth/logout:
+    post:
+      operationId: logout
+      security: [{ refreshCookie: [] }, {}]
+      parameters: [{ $ref: '#/components/parameters/Csrf' }]
+      responses:
+        '204': { description: Session cleared }
+        default: { $ref: '#/components/responses/Error' }
+  /api/auth/forgot-password:
+    post:
+      operationId: forgotPassword
+      requestBody:
+        $ref: '#/components/requestBodies/Email'
+      responses:
+        '202': { $ref: '#/components/responses/Message' }
+        default: { $ref: '#/components/responses/Error' }
+  /api/auth/reset-password:
+    post:
+      operationId: resetPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ResetPasswordRequest' }
+      responses:
+        '204': { description: Password replaced }
+        default: { $ref: '#/components/responses/Error' }
+  /api/auth/link-telegram:
+    post:
+      operationId: issueTelegramCode
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: One-time Telegram code
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TelegramCode' }
+        default: { $ref: '#/components/responses/Error' }
+  /api/me/dashboard:
+    get:
+      operationId: getDashboard
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Account and its subscription list
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Dashboard' }
+        '401': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /api/me/subscriptions/{id}:
+    get:
+      operationId: getSubscription
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Connection details for the selected subscription
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SubscriptionDetails' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+    refreshCookie: { type: apiKey, in: cookie, name: __Host-config_shop_refresh }
+  parameters:
+    Csrf:
+      name: X-CSRF-Protection
+      in: header
+      required: true
+      schema: { type: string, enum: ['1'] }
+  requestBodies:
+    Email:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/EmailRequest' }
+  responses:
+    Session:
+      description: Access token and rotating refresh cookie
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Session' }
+    Message:
+      description: Result message
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Message' }
+    Error:
+      description: Error response
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+  schemas:
+    EmailRequest:
+      type: object
+      required: [email]
+      properties:
+        email: { type: string, format: email, maxLength: 320 }
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email, maxLength: 320 }
+        password: { type: string, maxLength: 72 }
+    RegisterRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email, maxLength: 320 }
+        password: { type: string, minLength: 12, maxLength: 72 }
+        referralCode: { type: string, maxLength: 255 }
+    ConfirmationToken:
+      type: object
+      required: [token]
+      properties:
+        token: { type: string }
+    ResetPasswordRequest:
+      type: object
+      required: [token, password]
+      properties:
+        token: { type: string }
+        password: { type: string, minLength: 12, maxLength: 72 }
+    Session:
+      type: object
+      required: [accessToken, tokenType, expiresIn]
+      properties:
+        accessToken: { type: string }
+        tokenType: { type: string }
+        expiresIn: { type: integer, format: int64 }
+    Confirmation:
+      type: object
+      required: [emailVerified, trialCreated, accountId, message]
+      properties:
+        emailVerified: { type: boolean }
+        trialCreated: { type: boolean }
+        accountId: { type: string, format: uuid }
+        message: { type: string }
+    Message:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+    ApiError:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+        message: { type: string }
+    TelegramCode:
+      type: object
+      required: [code, expiresAt]
+      properties:
+        code: { type: string }
+        expiresAt: { type: string, format: date-time }
+    Dashboard:
+      type: object
+      required: [accountId, email, balance, telegramLinked, subscriptions]
+      properties:
+        accountId: { type: string, format: uuid }
+        email: { type: string, format: email }
+        balance: { type: integer, format: int64, description: Balance in rubles }
+        telegramLinked: { type: boolean }
+        subscriptions:
+          type: array
+          items:
+            type: object
+            required: [id]
+            properties:
+              id: { type: string, format: uuid }
+    SubscriptionDetails:
+      type: object
+      required: [id, expiresAt, active, usedTrafficGb, trafficLimitGb, connectionUrl]
+      properties:
+        id: { type: string, format: uuid }
+        expiresAt: { type: string, format: date-time }
+        active: { type: boolean }
+        usedTrafficGb: { type: number }
+        trafficLimitGb: { type: number, description: Zero represents unlimited traffic }
+        connectionUrl: { type: string, nullable: true }

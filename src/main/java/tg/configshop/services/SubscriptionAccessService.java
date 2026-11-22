@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tg.configshop.dto.SubscriptionSummary;
+import tg.configshop.exceptions.subscription.SubscriptionAccessException;
 import tg.configshop.model.RemnawaveSubscription;
 import tg.configshop.repositories.RemnawaveSubscriptionRepository;
 import java.util.List;
@@ -24,7 +25,7 @@ public class SubscriptionAccessService {
 
     public RemnawaveSubscription requireOwned(UUID accountId, UUID subscriptionId) {
         return subscriptions.findByIdAndAccount_Id(subscriptionId, accountId)
-                .orElseThrow(() -> new IllegalArgumentException("Subscription not found or belongs to another account"));
+                .orElseThrow(SubscriptionAccessException::new);
     }
 
     public RemnawaveSubscription requireExisting(UUID subscriptionId) {

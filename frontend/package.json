@@ -1,0 +1,31 @@
+{
+  "name": "config-shop-web",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.18.0" },
+  "scripts": {
+    "dev": "npm run generate && vite",
+    "generate": "orval",
+    "build": "npm run generate && tsc --noEmit && vite build"
+  },
+  "dependencies": {
+    "@mantine/core": "^9.8.2",
+    "@mantine/form": "^9.8.2",
+    "@mantine/hooks": "^9.8.2",
+    "@mantine/notifications": "^9.8.2",
+    "@tanstack/react-query": "^5.90.0",
+    "lucide-react": "^0.468.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-router": "^7.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^6.0.0",
+    "orval": "^8.49.0",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.8"
+  }
+}

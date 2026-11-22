@@ -1,0 +1,22 @@
+name: config-shop-web
+
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: frontend/Dockerfile
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/index.html || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      remnawave-network:
+        aliases:
+          - config-shop-web
+
+networks:
+  remnawave-network:
+    name: remnawave-network
+    external: true
