@@ -24,7 +24,12 @@ public class TelegramUserService implements LegacyNotificationResolver {
                 .getAccount().getId();
     }
     public UUID subscriptionId(Long telegramId) {
-        var owned = subscriptions.list(accountId(telegramId));
+        var user = botUserRepository.findById(telegramId).orElseThrow(() -> new IllegalArgumentException("Telegram profile not found"));
+        var owned = subscriptions.list(user.getAccount().getId());
+        if (user.getPreferredSubscriptionId() != null
+                && owned.stream().anyMatch(sub -> sub.id().equals(user.getPreferredSubscriptionId()))) {
+            return user.getPreferredSubscriptionId();
+        }
         if (owned.size() != 1) throw new SubscriptionSelectionException(owned.isEmpty() ? "У аккаунта нет подписки." : "У аккаунта несколько подписок. Это меню поддерживает одну подписку.");
         return owned.getFirst().id();
     }

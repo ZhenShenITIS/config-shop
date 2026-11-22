@@ -10,6 +10,9 @@ import java.util.UUID;
 
 public interface EmailConfirmationRepository extends JpaRepository<EmailConfirmation, UUID> {
     Optional<EmailConfirmation> findByTokenHash(String tokenHash);
+    @Query("select c.webUserId from EmailConfirmation c where c.tokenHash = :tokenHash")
+    Optional<UUID> findWebUserIdByTokenHash(String tokenHash);
+
     Optional<EmailConfirmation> findFirstByWebUserIdOrderByCreatedAtDescIdDesc(UUID webUserId);
 
     @Modifying

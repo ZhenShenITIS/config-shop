@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Привязать Telegram</title>
+    <style>
+        :root { color-scheme: light dark; font: 16px/1.5 system-ui, sans-serif; }
+        main { margin: 12vh auto; max-width: 26rem; padding: 0 1.25rem; }
+        label { display: block; margin: 0 0 1rem; }
+        input { display: block; width: 100%; box-sizing: border-box; }
+        button, input { padding: .6rem .8rem; font: inherit; }
+        output { display: block; margin: .75rem 0; font: 700 2.25rem monospace; letter-spacing: .2em; }
+        output:empty { display: none; }
+    </style>
+</head>
+<body>
+<main>
+    <h1>Привязать Telegram</h1>
+    <form id="login" hidden>
+        <label>Почта <input name="email" type="email" autocomplete="username" required></label>
+        <label>Пароль <input name="password" type="password" autocomplete="current-password" required></label>
+        <button>Войти</button>
+    </form>
+    <button id="generate" hidden>Получить код</button>
+    <output id="code" aria-label="Шестизначный код" aria-live="polite"></output>
+    <p id="status" role="status"></p>
+</main>
+<script>
+    const login = document.querySelector('#login');
+    const generate = document.querySelector('#generate');
+    const code = document.querySelector('#code');
+    const status = document.querySelector('#status');
+    let accessToken;
+    let expiryTimer;
+
+    async function refresh() {
+        const response = await fetch('/api/auth/refresh', {
+            method: 'POST', headers: {'X-CSRF-Protection': '1'}
+        });
+        accessToken = response.ok ? (await response.json()).accessToken : null;
+        login.hidden = Boolean(accessToken);
+        generate.hidden = !accessToken;
+    }
+
+    login.addEventListener('submit', async event => {
+        event.preventDefault();
+        const submit = login.querySelector('button');
+        submit.disabled = true;
+        status.textContent = '';
+        try {
+            const response = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(Object.fromEntries(new FormData(login)))
+            });
+            const payload = await response.json();
+            if (!response.ok) throw new Error(payload.message || 'Не удалось войти.');
+            accessToken = payload.accessToken;
+            login.reset();
+            login.hidden = true;
+            generate.hidden = false;
+            generate.focus();
+        } catch (error) {
+            status.textContent = error.message;
+        } finally {
+            submit.disabled = false;
+        }
+    });
+
+    function requestCode() {
+        return fetch('/api/auth/link-telegram', {
+            method: 'POST', headers: {Authorization: 'Bearer ' + accessToken}
+        });
+    }
+
+    generate.addEventListener('click', async () => {
+        generate.disabled = true;
+        status.textContent = '';
+        code.textContent = '';
+        clearTimeout(expiryTimer);
+        try {
+            let response = await requestCode();
+            if (response.status === 401) {
+                await refresh();
+                if (!accessToken) return;
+                response = await requestCode();
+            }
+            const payload = await response.json();
+            if (!response.ok) throw new Error(payload.message || 'Не удалось получить код.');
+            code.textContent = payload.code;
+            status.textContent = 'В личном чате с ботом нажмите «Подключить сайт» и введите код. Он действует 5 минут.';
+            expiryTimer = setTimeout(() => {
+                code.textContent = '';
+                status.textContent = 'Срок действия кода истёк. Получите новый.';
+            }, Math.max(Date.parse(payload.expiresAt) - Date.now(), 0));
+        } catch (error) {
+            status.textContent = error.message;
+        } finally {
+            generate.disabled = false;
+        }
+    });
+
+    refresh().catch(() => {
+        login.hidden = false;
+        status.textContent = 'Войдите, чтобы получить код.';
+    });
+</script>
+</body>
+</html>

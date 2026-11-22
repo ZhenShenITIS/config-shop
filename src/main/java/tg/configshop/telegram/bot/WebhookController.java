@@ -6,11 +6,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import tg.configshop.alerting.AlertService;
+import tg.configshop.telegram.config.TelegramWebhookSecret;
 
 @Slf4j
 @RestController
@@ -20,11 +23,17 @@ public class WebhookController extends AbstractBot {
     private final AlertService alertService;
 
     private final WebhookBot webhookBot;
+    private final TelegramWebhookSecret webhookSecret;
 
     private final ObjectMapper jackson2Mapper = new ObjectMapper();
 
     @PostMapping("/webhook")
-    public ResponseEntity<String> onUpdateReceived(@RequestBody String json) {
+    public ResponseEntity<String> onUpdateReceived(
+            @RequestHeader(name = TelegramWebhookSecret.HEADER, required = false) String secret,
+            @RequestBody String json) {
+        if (!webhookSecret.matches(secret)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
         try {
             Update update = jackson2Mapper.readValue(json, Update.class);
 

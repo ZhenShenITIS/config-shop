@@ -26,4 +26,9 @@ public class SubscriptionAccessService {
         return subscriptions.findByIdAndAccount_Id(subscriptionId, accountId)
                 .orElseThrow(() -> new IllegalArgumentException("Subscription not found or belongs to another account"));
     }
+
+    public RemnawaveSubscription requireExisting(UUID subscriptionId) {
+        return subscriptions.findById(subscriptionId)
+                .orElseThrow(() -> new IllegalArgumentException("Subscription not found"));
+    }
 }

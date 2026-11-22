@@ -10,7 +10,7 @@ class RegistrationRateLimiterTest {
     void limitsRegistrationPerAddressAndKeepsOtherClientsAndOperationsIndependent() {
         var limiter = new RegistrationRateLimiter();
         for (int i = 0; i < 5; i++) limiter.register("127.0.0.1");
-        var failure = assertThrows(WebRegistrationException.class, () -> limiter.register("127.0.0.1"));
+        var failure = assertThrows(WebAuthException.class, () -> limiter.register("127.0.0.1"));
         assertEquals(HttpStatus.TOO_MANY_REQUESTS, failure.getStatus());
         assertDoesNotThrow(() -> limiter.register("127.0.0.2"));
         assertDoesNotThrow(() -> limiter.resend("127.0.0.1"));

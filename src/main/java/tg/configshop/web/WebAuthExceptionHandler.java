@@ -5,12 +5,12 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import tg.configshop.web.registration.WebRegistrationException;
+import tg.configshop.web.registration.WebAuthException;
 
-@RestControllerAdvice(assignableTypes = WebRegistrationController.class)
-public class WebRegistrationExceptionHandler {
-    @ExceptionHandler(WebRegistrationException.class)
-    public ResponseEntity<ErrorResponse> registrationError(WebRegistrationException exception) {
+@RestControllerAdvice(assignableTypes = {WebRegistrationController.class, WebAuthenticationController.class})
+public class WebAuthExceptionHandler {
+    @ExceptionHandler(WebAuthException.class)
+    public ResponseEntity<ErrorResponse> authError(WebAuthException exception) {
         return ResponseEntity.status(exception.getStatus())
                 .body(new ErrorResponse(exception.getError(), exception.getMessage()));
     }

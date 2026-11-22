@@ -23,8 +23,9 @@ public class WebJwtAuthenticationConverter implements Converter<Jwt, AbstractAut
     public AbstractAuthenticationToken convert(Jwt jwt) {
         var user = users.findById(UUID.fromString(jwt.getSubject()))
                 .orElseThrow(() -> new InvalidBearerTokenException("Web user does not exist"));
-        if (!user.getAccountId().equals(UUID.fromString(jwt.getClaimAsString("account_id")))) {
-            throw new InvalidBearerTokenException("Account does not match web user");
+        if (user.getEmailVerifiedAt() == null
+                || !UUID.fromString(jwt.getClaimAsString("account_id")).equals(user.getAccountId())) {
+            throw new InvalidBearerTokenException("Invalid web user or account");
         }
         var principal = new WebPrincipal(user.getId(), user.getAccountId(), user.getEmail(), user.getEmailVerifiedAt());
         return UsernamePasswordAuthenticationToken.authenticated(principal, null, List.of());

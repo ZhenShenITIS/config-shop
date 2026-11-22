@@ -15,6 +15,7 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 public class WebhookConfig {
 
     private final TelegramConfig telegramConfig;
+    private final TelegramWebhookSecret secret;
 
     @PostConstruct
     public void registerWebhook() {
@@ -27,6 +28,7 @@ public class WebhookConfig {
 
             SetWebhook setWebhook = SetWebhook.builder()
                     .url(fullWebhookUrl)
+                    .secretToken(secret.value())
                     .build();
 
             Boolean result = client.execute(setWebhook);

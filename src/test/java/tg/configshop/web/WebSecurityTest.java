@@ -32,6 +32,7 @@ import tg.configshop.repositories.WebUserRepository;
 import tg.configshop.services.ExternalTrafficService;
 import tg.configshop.telegram.bot.WebhookBot;
 import tg.configshop.telegram.bot.WebhookController;
+import tg.configshop.telegram.config.TelegramWebhookSecret;
 import tg.configshop.web.security.WebJwtAuthenticationConverter;
 import tg.configshop.web.security.WebSecurityConfig;
 
@@ -55,10 +56,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(controllers = MeController.class, properties = {
         "web.auth.jwt-secret-base64=" + WebSecurityTest.SECRET_BASE64,
-        "web.auth.issuer=config-shop", "web.auth.audience=config-shop-web-api", "start.webhook=true"
+        "web.auth.issuer=config-shop", "web.auth.audience=config-shop-web-api", "start.webhook=true",
+        "TELEGRAM_BOT_TOKEN=test-token"
 })
 @Import({WebSecurityConfig.class, WebJwtAuthenticationConverter.class, RemnawaveWebhookController.class,
-        WebhookController.class, WebSecurityTest.TestRoutes.class})
+        WebhookController.class, TelegramWebhookSecret.class, WebSecurityTest.TestRoutes.class})
 @ActiveProfiles("dev")
 class WebSecurityTest {
     static final String SECRET_BASE64 = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWYwMTIzNDU2Nzg5YWJjZGVmMDEyMzQ1Njc4OWFiY2RlZg==";
@@ -185,6 +187,14 @@ class WebSecurityTest {
         mvc.perform(post("/internal/remnawave/webhook").content("{}").header("X-Remnawave-Signature", "invalid"))
                 .andExpect(status().isUnauthorized());
         mvc.perform(post("/webhook").contentType(MediaType.APPLICATION_JSON).content("{\"update_id\":1}"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(post("/webhook").contentType(MediaType.APPLICATION_JSON).content("{\"update_id\":1}")
+                        .header(TelegramWebhookSecret.HEADER, "wrong-secret"))
+                .andExpect(status().isUnauthorized());
+        verifyNoInteractions(webhookBot);
+        mvc.perform(post("/webhook").contentType(MediaType.APPLICATION_JSON).content("{\"update_id\":1}")
+                        .header(TelegramWebhookSecret.HEADER,
+                                "3dec8899493df720bc659a0e35049b43e18254a0a70cd54f8fa0e73f78ba625d"))
                 .andExpect(status().isOk());
         verify(webhookBot, timeout(1000)).processUpdate(any());
         verifyNoInteractions(users);

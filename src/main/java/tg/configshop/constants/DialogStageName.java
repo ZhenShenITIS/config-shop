@@ -12,6 +12,7 @@ public enum DialogStageName {
     ADD_REF_PROMO_INPUT("add_ref_promo"),
     DEVICE_INPUT("device_input"),
     CRYPTO_WITHDRAW_WALLET("crypto_wd_wallet"),
+    WEBSITE_CODE("website_code"),
     NONE("none");
 
     private final String dialogStageName;

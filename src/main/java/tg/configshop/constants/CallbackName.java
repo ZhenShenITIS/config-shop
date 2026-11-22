@@ -12,6 +12,7 @@ public enum CallbackName {
     SUBSCRIPTION("2"),
     PROMO_CODE("3"),
     REFERRAL("4"),
+    CONNECT_WEBSITE("web_link"),
 
     // balance
     HISTORY("5"),

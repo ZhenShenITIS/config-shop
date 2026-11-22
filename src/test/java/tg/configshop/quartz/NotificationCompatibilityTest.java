@@ -79,7 +79,12 @@ class NotificationCompatibilityTest {
     }
     @Test void newJobDoesNotNeedLegacyRecipient() {
         var data=new JobDataMap();data.put("accountId",accountId.toString());data.put("subscriptionId",secondId.toString());
-        assertEquals(secondId,new NotificationJobSupport(subscriptions,legacy).target(data).subscriptionId());
+        UUID mergedAccount = UUID.randomUUID();
+        when(subscriptions.requireExisting(secondId)).thenReturn(RemnawaveSubscription.builder()
+                .account(Account.builder().id(mergedAccount).build()).build());
+        var target = new NotificationJobSupport(subscriptions,legacy).target(data);
+        assertEquals(secondId, target.subscriptionId());
+        assertEquals(mergedAccount, target.accountId());
         verifyNoInteractions(legacy,resolver);
     }
     @Test void oldJobWithExplicitSubscriptionChecksItsOwner() {

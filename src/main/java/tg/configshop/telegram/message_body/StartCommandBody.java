@@ -62,7 +62,7 @@ public class StartCommandBody {
 
         if (selectionProblem != null) text = selectionProblem;
 
-        InlineKeyboardMarkup keyboard = InlineKeyboardMarkup
+        var keyboard = InlineKeyboardMarkup
                 .builder()
 //                .keyboardRow(new InlineKeyboardRow(
 //                        InlineKeyboardButton
@@ -108,10 +108,12 @@ public class StartCommandBody {
                                 .text(ButtonText.INFO.getText())
                                 .callbackData(CallbackName.DOCS_INFO.getCallbackName())
                                 .build()
-                ))
-                .build();
+                ));
+        keyboard.keyboardRow(new InlineKeyboardRow(InlineKeyboardButton.builder()
+                .text(ButtonText.CONNECT_WEBSITE.getText())
+                .callbackData(CallbackName.CONNECT_WEBSITE.getCallbackName()).build()));
 
-        return new BotMessageParams(text, keyboard);
+        return new BotMessageParams(text, keyboard.build());
 
     }
 

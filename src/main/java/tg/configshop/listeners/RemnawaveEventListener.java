@@ -13,7 +13,7 @@ public class RemnawaveEventListener {
     private final SubscriptionAccessService subscriptions;
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleSubscriptionPaid(SubscriptionPaidEvent event) {
-        var subscription = subscriptions.requireOwned(event.accountId(), event.subscriptionId());
+        var subscription = subscriptions.requireExisting(event.subscriptionId());
         remnawaveClient.updateSubscription(subscription.remnawaveRef(), event.newExpired(), event.devices());
     }
 }

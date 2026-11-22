@@ -15,6 +15,6 @@ public class RemnawaveTrafficEventListener {
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleTrafficPaid(TrafficPaidEvent event) {
-        externalTrafficService.applyTrafficPurchase(subscriptions.requireOwned(event.accountId(), event.subscriptionId()).remnawaveRef(), event.trafficGb());
+        externalTrafficService.applyTrafficPurchase(subscriptions.requireExisting(event.subscriptionId()).remnawaveRef(), event.trafficGb());
     }
 }

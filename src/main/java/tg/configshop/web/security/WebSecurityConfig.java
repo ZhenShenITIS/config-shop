@@ -17,11 +17,16 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationConverter;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
+import org.springframework.security.web.util.matcher.OrRequestMatcher;
 import org.springframework.util.Assert;
 
 import javax.crypto.spec.SecretKeySpec;
@@ -39,7 +44,7 @@ public class WebSecurityConfig {
             writeError(response, 403, "forbidden");
 
     @Bean
-    JwtDecoder jwtDecoder(WebAuthProperties properties) {
+    SecretKeySpec jwtSigningKey(WebAuthProperties properties) {
         Assert.hasText(properties.issuer(), "WEB_AUTH_ISSUER must not be blank");
         Assert.hasText(properties.audience(), "WEB_AUTH_AUDIENCE must not be blank");
         byte[] key;
@@ -49,7 +54,17 @@ public class WebSecurityConfig {
             throw new IllegalArgumentException("WEB_AUTH_JWT_SECRET_BASE64 must contain valid Base64");
         }
         Assert.isTrue(key.length >= 32, "WEB_AUTH_JWT_SECRET_BASE64 must encode at least 32 random bytes");
-        var decoder = NimbusJwtDecoder.withSecretKey(new SecretKeySpec(key, "HmacSHA256"))
+        return new SecretKeySpec(key, "HmacSHA256");
+    }
+
+    @Bean
+    JwtEncoder jwtEncoder(SecretKeySpec jwtSigningKey) {
+        return NimbusJwtEncoder.withSecretKey(jwtSigningKey).build();
+    }
+
+    @Bean
+    JwtDecoder jwtDecoder(WebAuthProperties properties, SecretKeySpec jwtSigningKey) {
+        var decoder = NimbusJwtDecoder.withSecretKey(jwtSigningKey)
                 .macAlgorithm(MacAlgorithm.HS256).build();
         decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
                 JwtValidators.createDefaultWithIssuer(properties.issuer()),
@@ -66,6 +81,10 @@ public class WebSecurityConfig {
     @Order(1)
     SecurityFilterChain webApiSecurity(HttpSecurity http, JwtDecoder decoder,
                                        WebJwtAuthenticationConverter converter) throws Exception {
+        var paths = PathPatternRequestMatcher.withDefaults();
+        var cookieEndpoints = new OrRequestMatcher(paths.matcher(HttpMethod.POST, "/api/auth/refresh"),
+                paths.matcher(HttpMethod.POST, "/api/auth/logout"));
+        var bearer = new BearerTokenAuthenticationConverter();
         return http.securityMatcher("/api/**")
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .requestCache(AbstractHttpConfigurer::disable)
@@ -75,11 +94,14 @@ public class WebSecurityConfig {
                 .logout(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/confirm-email",
-                                "/api/auth/resend-confirmation").permitAll()
+                                "/api/auth/resend-confirmation", "/api/auth/login", "/api/auth/refresh",
+                                "/api/auth/logout", "/api/auth/forgot-password", "/api/auth/reset-password").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(errors -> errors.authenticationEntryPoint(UNAUTHORIZED).accessDeniedHandler(FORBIDDEN))
                 .oauth2ResourceServer(resource -> resource
                         .authenticationEntryPoint(UNAUTHORIZED).accessDeniedHandler(FORBIDDEN)
+                        // Clients can refresh or log out even with an expired access token in the header.
+                        .authenticationConverter(request -> cookieEndpoints.matches(request) ? null : bearer.convert(request))
                         .jwt(jwt -> jwt.decoder(decoder).jwtAuthenticationConverter(converter)))
                 .build();
     }
@@ -95,6 +117,7 @@ public class WebSecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers(HttpMethod.POST, "/webhook", "/internal/remnawave/webhook").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/link-telegram.html").permitAll()
                         .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/prometheus", "/actuator/info").permitAll()
                         .anyRequest().denyAll())
                 .exceptionHandling(errors -> errors.authenticationEntryPoint(UNAUTHORIZED).accessDeniedHandler(FORBIDDEN))

@@ -2,6 +2,7 @@ package tg.configshop.web.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import tg.configshop.web.WebTokens;
 
-public record ConfirmEmailRequest(@NotBlank @Pattern(regexp = "[A-Za-z0-9_-]{43}") String token) {
+public record ConfirmEmailRequest(@NotBlank @Pattern(regexp = WebTokens.FORMAT) String token) {
 }

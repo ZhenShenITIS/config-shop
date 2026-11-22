@@ -12,6 +12,8 @@ import java.util.UUID;
 public interface WebUserRepository extends JpaRepository<WebUser, UUID> {
     Optional<WebUser> findByEmailIgnoreCase(String email);
 
+    boolean existsByAccountId(UUID accountId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select u from WebUser u where u.id = :id")
     Optional<WebUser> findByIdWithLock(UUID id);

@@ -13,7 +13,7 @@ class WebSecurityConfigTest {
     void rejectsMissingMalformedAndShortSecret() {
         for (String secret : new String[]{null, "", "not base64!", Base64.getEncoder().encodeToString(new byte[31])}) {
             var failure = assertThrows(IllegalArgumentException.class,
-                    () -> config.jwtDecoder(new WebAuthProperties(secret, "issuer", "audience")));
+                    () -> config.jwtSigningKey(new WebAuthProperties(secret, "issuer", "audience")));
             assertTrue(failure.getMessage().contains("WEB_AUTH_JWT_SECRET_BASE64"));
         }
     }
@@ -21,8 +21,8 @@ class WebSecurityConfigTest {
     @Test
     void requiresIssuerAndAudience() {
         String secret = Base64.getEncoder().encodeToString(new byte[32]);
-        assertThrows(IllegalArgumentException.class, () -> config.jwtDecoder(new WebAuthProperties(secret, "", "audience")));
-        assertThrows(IllegalArgumentException.class, () -> config.jwtDecoder(new WebAuthProperties(secret, "issuer", "")));
+        assertThrows(IllegalArgumentException.class, () -> config.jwtSigningKey(new WebAuthProperties(secret, "", "audience")));
+        assertThrows(IllegalArgumentException.class, () -> config.jwtSigningKey(new WebAuthProperties(secret, "issuer", "")));
     }
 
     @Test

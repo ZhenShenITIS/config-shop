@@ -12,6 +12,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import java.time.Instant;
+import java.util.UUID;
 
 @Entity
 @Getter
@@ -28,6 +29,7 @@ public class BotUser {
     private String name;
     private String lastName;
     private String username;
+    private UUID preferredSubscriptionId;
     @ManyToOne(optional = false)
     private Account account;
     @Builder.Default
@@ -38,6 +40,10 @@ public class BotUser {
     public String getFirstName() { return name; }
 
     public RemnawaveSubscription getSubscription() {
+        if (preferredSubscriptionId != null) {
+            return account.getSubscriptions().stream().filter(sub -> preferredSubscriptionId.equals(sub.getId()))
+                    .findFirst().orElseThrow();
+        }
         if (account.getSubscriptions().size() != 1) {
             throw new IllegalStateException("Expected one subscription for account " + account.getId());
         }

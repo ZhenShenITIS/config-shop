@@ -16,8 +16,9 @@ public class NotificationJobSupport {
         UUID accountId;
         UUID subscriptionId;
         if (data.containsKey("accountId")) {
-            accountId = UUID.fromString(data.getString("accountId"));
             subscriptionId = UUID.fromString(data.getString("subscriptionId"));
+            // A trusted persisted job follows the subscription if its account is merged.
+            return new NotificationTarget(subscriptions.requireExisting(subscriptionId).getAccount().getId(), subscriptionId);
         } else {
             var resolver = legacy.getIfAvailable();
             if (resolver == null) throw new IllegalStateException("Legacy notification resolver is unavailable");

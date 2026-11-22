@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.util.UUID;
 
 @Component
 public class RegistrationRateLimiter {
@@ -27,11 +28,32 @@ public class RegistrationRateLimiter {
         consume("confirm:" + address, 30, Duration.ofMinutes(1));
     }
 
+    public void login(String address) {
+        consume("login:" + address, 30, Duration.ofMinutes(1));
+    }
+
+    public void forgotPassword(String address) {
+        consume("forgot-password:" + address, 10, Duration.ofHours(1));
+    }
+
+    public void resetPassword(String address) {
+        consume("reset-password:" + address, 30, Duration.ofMinutes(1));
+    }
+
+    public void telegramCode(long telegramId) {
+        consume("telegram-code:" + telegramId, 5, Duration.ofMinutes(10));
+        consume("telegram-code", 60, Duration.ofMinutes(1));
+    }
+
+    public void issueTelegramCode(UUID webUserId) {
+        consume("issue-telegram-code:" + webUserId, 10, Duration.ofMinutes(1));
+    }
+
     private void consume(String key, int capacity, Duration period) {
         var bucket = buckets.asMap().computeIfAbsent(key, ignored -> Bucket.builder()
                 .addLimit(Bandwidth.classic(capacity, Refill.greedy(capacity, period))).build());
         if (!bucket.tryConsume(1)) {
-            throw new WebRegistrationException(HttpStatus.TOO_MANY_REQUESTS, "rate_limit_exceeded",
+            throw new WebAuthException(HttpStatus.TOO_MANY_REQUESTS, "rate_limit_exceeded",
                     "Слишком много запросов. Попробуйте позже.");
         }
     }
