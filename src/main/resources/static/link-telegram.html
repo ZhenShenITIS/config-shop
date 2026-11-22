@@ -87,6 +87,11 @@
                 response = await requestCode();
             }
             const payload = await response.json();
+            if (payload.error === 'telegram_already_linked') {
+                generate.hidden = true;
+                status.textContent = payload.message;
+                return;
+            }
             if (!response.ok) throw new Error(payload.message || 'Не удалось получить код.');
             code.textContent = payload.code;
             status.textContent = 'В личном чате с ботом нажмите «Подключить сайт» и введите код. Он действует 5 минут.';

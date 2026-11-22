@@ -56,9 +56,11 @@ import tg.configshop.telegram.TelegramUserService;
 import tg.configshop.constants.CallbackName;
 import tg.configshop.telegram.handlers.CallbackQueryHandler;
 import tg.configshop.telegram.handlers.MessageHandler;
+import tg.configshop.telegram.message_body.StartCommandBody;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -112,6 +114,7 @@ class WebRegistrationIntegrationTest {
     @Autowired TelegramUserService telegramUsers;
     @Autowired CallbackQueryHandler callbackHandler;
     @Autowired MessageHandler messageHandler;
+    @Autowired StartCommandBody startMenu;
     @Autowired TelegramWebLinkService telegramLinks;
 
     @DynamicPropertySource
@@ -556,6 +559,10 @@ class WebRegistrationIntegrationTest {
         String newToken = new ObjectMapper().readTree(refreshed.getContentAsString()).get("accessToken").asText();
         mvc.perform(get("/api/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + newToken))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.accountId").value(keep.toString()));
+        mvc.perform(post("/api/auth/link-telegram").header(HttpHeaders.AUTHORIZATION, "Bearer " + newToken))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("telegram_already_linked"))
+                .andExpect(jsonPath("$.message").value("Telegram уже подключён к этому аккаунту."));
         assertEquals("telegram_already_linked", assertThrows(WebAuthException.class,
                 () -> telegramLinks.issue(webUser.getId())).getError());
         verifyNoInteractions(remote, scheduler, sender);
@@ -604,6 +611,25 @@ class WebRegistrationIntegrationTest {
         assertEquals(keep, telegramLinks.redeem(42L, telegramLinks.issue(web.getId()).code()));
         assertEquals(1, referralRepository.count());
         assertEquals(keep, jdbc.queryForObject("SELECT referrer_id FROM referrals WHERE referral_id = ?", UUID.class, descendant));
+    }
+
+    @Test
+    void mainMenuHidesWebsiteButtonAfterLinking() {
+        UUID telegramAccount = accounts.saveAndFlush(Account.builder().build()).getId();
+        UUID webAccount = accounts.saveAndFlush(Account.builder().build()).getId();
+        jdbc.update("INSERT INTO bot_users(telegram_id, account_id) VALUES (?, ?)", 42L, telegramAccount);
+        var web = verifiedWebUser(webAccount, "user@example.com");
+        var user = new User(42L, "Test", false);
+
+        assertTrue(hasConnectWebsiteButton(user));
+        telegramLinks.redeem(42L, telegramLinks.issue(web.getId()).code());
+        assertFalse(hasConnectWebsiteButton(user));
+    }
+
+    private boolean hasConnectWebsiteButton(User user) {
+        return startMenu.getMessage(user, null).inlineKeyboard().getKeyboard().stream()
+                .flatMap(Collection::stream)
+                .anyMatch(button -> CallbackName.CONNECT_WEBSITE.getCallbackName().equals(button.getCallbackData()));
     }
 
     private WebUser verifiedWebUser(UUID accountId, String email) {

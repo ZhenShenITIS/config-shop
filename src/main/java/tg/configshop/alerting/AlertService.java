@@ -3,12 +3,11 @@ package tg.configshop.alerting;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.User;
-import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
-import org.telegram.telegrambots.meta.generics.TelegramClient;
 import tg.configshop.constants.MessageText;
+
+import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -34,5 +33,10 @@ public class AlertService {
                 e.toString()
         );
         telegramSenderWithRateLimit.sendMessageInTopic(chatId, topicId, text);
+    }
+
+    public void alertPasswordResetDeliveryFailure(UUID webUserId) {
+        telegramSenderWithRateLimit.sendMessageInTopic(chatId, topicId,
+                "Не удалось отправить письмо для сброса пароля. ID веб-профиля: " + webUserId);
     }
 }

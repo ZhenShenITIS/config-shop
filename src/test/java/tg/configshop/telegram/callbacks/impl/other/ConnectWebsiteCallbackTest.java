@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import tg.configshop.constants.DialogStageName;
 import tg.configshop.repositories.UserStateRepository;
+import tg.configshop.repositories.WebUserRepository;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
@@ -23,8 +24,9 @@ import static org.mockito.Mockito.*;
 class ConnectWebsiteCallbackTest {
     private final TelegramUserService users = mock(TelegramUserService.class);
     private final UserStateRepository states = mock(UserStateRepository.class);
+    private final WebUserRepository webUsers = mock(WebUserRepository.class);
     private final TelegramClient client = mock(TelegramClient.class);
-    private final ConnectWebsiteCallback callback = new ConnectWebsiteCallback(users, states);
+    private final ConnectWebsiteCallback callback = new ConnectWebsiteCallback(users, states, webUsers);
 
     @Test
     void asksForCodeOnlyInPrivateChat() throws Exception {
@@ -45,8 +47,24 @@ class ConnectWebsiteCallbackTest {
     void refusesToAskForCodeInGroupChat() throws Exception {
         callback.processCallback(query(-10042L), client);
 
-        verifyNoInteractions(users, states);
+        verifyNoInteractions(users, states, webUsers);
         verify(client).execute(any(AnswerCallbackQuery.class));
+        verifyNoMoreInteractions(client);
+    }
+
+    @Test
+    void oldButtonReportsAlreadyLinkedWithoutEnteringCodeStage() throws Exception {
+        UUID accountId = UUID.randomUUID();
+        when(users.getUser(42L)).thenReturn(BotUser.builder()
+                .account(Account.builder().id(accountId).build()).build());
+        when(webUsers.existsByAccountId(accountId)).thenReturn(true);
+
+        callback.processCallback(query(42L), client);
+
+        var answer = ArgumentCaptor.forClass(AnswerCallbackQuery.class);
+        verify(client).execute(answer.capture());
+        assertEquals("Сайт уже подключён.", answer.getValue().getText());
+        verifyNoInteractions(states);
         verifyNoMoreInteractions(client);
     }
 

@@ -9,6 +9,7 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import tg.configshop.alerting.AlertService;
 import tg.configshop.web.WebTokens;
 
 import java.util.UUID;
@@ -17,15 +18,17 @@ import java.util.UUID;
 @Slf4j
 public class WebAuthMailService {
     private final ObjectProvider<JavaMailSender> senders;
+    private final AlertService alerts;
     private final String from;
     private final String confirmationUrl;
     private final String passwordResetUrl;
 
-    public WebAuthMailService(ObjectProvider<JavaMailSender> senders,
+    public WebAuthMailService(ObjectProvider<JavaMailSender> senders, AlertService alerts,
             @Value("${web.registration.mail-from}") String from,
             @Value("${web.registration.confirmation-url}") String confirmationUrl,
             @Value("${web.auth.password-reset-url}") String passwordResetUrl) {
         this.senders = senders;
+        this.alerts = alerts;
         this.from = from;
         this.confirmationUrl = confirmationUrl;
         this.passwordResetUrl = passwordResetUrl;
@@ -42,9 +45,11 @@ public class WebAuthMailService {
 
     @Async
     public void sendPasswordReset(UUID webUserId, String email, String token) {
-        sendLink(webUserId, email, passwordResetUrl, "Сброс пароля",
+        if (!sendLink(webUserId, email, passwordResetUrl, "Сброс пароля",
                 "Установите новый пароль по ссылке:\n" + passwordResetUrl + "#token=" + token
-                + "\n\nСсылка действует 30 минут. Если вы не запрашивали сброс пароля, проигнорируйте письмо.");
+                + "\n\nСсылка действует 30 минут. Если вы не запрашивали сброс пароля, проигнорируйте письмо.")) {
+            alerts.alertPasswordResetDeliveryFailure(webUserId);
+        }
     }
 
     private boolean sendLink(UUID recipientId, String email, String url, String subject, String text) {

@@ -31,7 +31,10 @@ public class TelegramWebLinkService {
     public LinkCode issue(UUID webUserId) {
         limits.issueTelegramCode(webUserId);
         UUID accountId = lockWebAccount(webUserId);
-        if (hasTelegramProfile(accountId)) throw alreadyLinked();
+        if (hasTelegramProfile(accountId)) {
+            throw new WebAuthException(HttpStatus.CONFLICT, "telegram_already_linked",
+                    "Telegram уже подключён к этому аккаунту.");
+        }
         var previousHash = jdbc.sql("DELETE FROM web_telegram_links WHERE web_user_id = :user RETURNING code_hash")
                 .param("user", webUserId).query(String.class).optional();
 
@@ -80,7 +83,8 @@ public class TelegramWebLinkService {
                 .param("now", clock.instant().atOffset(ZoneOffset.UTC)).update();
         if (consumed == 0) throw invalidCode();
         if (!webAccount.equals(telegramAccount) && (hasTelegramProfile(webAccount) || hasWebProfile(telegramAccount))) {
-            throw alreadyLinked();
+            throw new WebAuthException(HttpStatus.CONFLICT, "telegram_link_conflict",
+                    "Один из профилей уже привязан к другому аккаунту.");
         }
         return webAccount.equals(telegramAccount) ? webAccount : accounts.merge(telegramAccount, webAccount);
     }
@@ -110,11 +114,6 @@ public class TelegramWebLinkService {
     private WebAuthException invalidCode() {
         return new WebAuthException(HttpStatus.BAD_REQUEST, "invalid_telegram_code",
                 "Код неверный или срок его действия истёк. Возьмите новый код на сайте.");
-    }
-
-    private WebAuthException alreadyLinked() {
-        return new WebAuthException(HttpStatus.CONFLICT, "telegram_already_linked",
-                "Один из профилей уже привязан к другому аккаунту.");
     }
 
     public record LinkCode(String code, Instant expiresAt) { }

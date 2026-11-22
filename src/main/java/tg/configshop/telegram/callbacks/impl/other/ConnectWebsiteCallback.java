@@ -10,6 +10,7 @@ import org.telegram.telegrambots.meta.generics.TelegramClient;
 import tg.configshop.constants.CallbackName;
 import tg.configshop.constants.DialogStageName;
 import tg.configshop.repositories.UserStateRepository;
+import tg.configshop.repositories.WebUserRepository;
 import tg.configshop.telegram.TelegramUserService;
 import tg.configshop.telegram.callbacks.Callback;
 import tg.configshop.telegram.dialogstages.impl.WebsiteCodeDialogStage;
@@ -19,6 +20,7 @@ import tg.configshop.telegram.dialogstages.impl.WebsiteCodeDialogStage;
 public class ConnectWebsiteCallback implements Callback {
     private final TelegramUserService users;
     private final UserStateRepository states;
+    private final WebUserRepository webUsers;
 
     @Override
     public CallbackName getCallback() {
@@ -31,8 +33,13 @@ public class ConnectWebsiteCallback implements Callback {
         String error = null;
         if (query.getMessage() == null || query.getMessage().getChatId() != telegramId) {
             error = "Введите код в личном чате с ботом.";
-        } else if (users.getUser(telegramId) == null) {
-            error = "Сначала зарегистрируйтесь в боте через /start.";
+        } else {
+            var user = users.getUser(telegramId);
+            if (user == null) {
+                error = "Сначала зарегистрируйтесь в боте через /start.";
+            } else if (webUsers.existsByAccountId(user.getAccount().getId())) {
+                error = "Сайт уже подключён.";
+            }
         }
 
         try {

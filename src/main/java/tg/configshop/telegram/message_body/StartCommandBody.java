@@ -13,6 +13,7 @@ import tg.configshop.constants.ButtonText;
 import tg.configshop.constants.CallbackName;
 import tg.configshop.constants.MessageText;
 import tg.configshop.model.BotUser;
+import tg.configshop.repositories.WebUserRepository;
 import tg.configshop.telegram.TelegramRegistrationService;
 import tg.configshop.telegram.TelegramUserService;
 import tg.configshop.telegram.dto.BotMessageParams;
@@ -25,6 +26,7 @@ public class StartCommandBody {
     private final TelegramRegistrationService registrationService;
     private final TelegramUserService userService;
     private final ExternalSubscriptionService externalSubscriptionService;
+    private final WebUserRepository webUsers;
 
     @Value("${CONFIG_PANEL_SUB_URL}")
     private String subUrl;
@@ -109,9 +111,11 @@ public class StartCommandBody {
                                 .callbackData(CallbackName.DOCS_INFO.getCallbackName())
                                 .build()
                 ));
-        keyboard.keyboardRow(new InlineKeyboardRow(InlineKeyboardButton.builder()
-                .text(ButtonText.CONNECT_WEBSITE.getText())
-                .callbackData(CallbackName.CONNECT_WEBSITE.getCallbackName()).build()));
+        if (!webUsers.existsByAccountId(botUser.getAccount().getId())) {
+            keyboard.keyboardRow(new InlineKeyboardRow(InlineKeyboardButton.builder()
+                    .text(ButtonText.CONNECT_WEBSITE.getText())
+                    .callbackData(CallbackName.CONNECT_WEBSITE.getCallbackName()).build()));
+        }
 
         return new BotMessageParams(text, keyboard.build());
 
