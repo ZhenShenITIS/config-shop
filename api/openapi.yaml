@@ -126,6 +126,52 @@ paths:
         '404': { $ref: '#/components/responses/Error' }
         '503': { $ref: '#/components/responses/Error' }
         default: { $ref: '#/components/responses/Error' }
+  /api/me/subscriptions/{id}/renewal-options:
+    parameters:
+      - $ref: '#/components/parameters/SubscriptionId'
+    get:
+      operationId: getRenewalOptions
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Current subscription terms and available renewal periods
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RenewalOptions' }
+        '404': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /api/me/subscriptions/{id}/renewals:
+    parameters:
+      - $ref: '#/components/parameters/SubscriptionId'
+    post:
+      operationId: confirmRenewal
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RenewalRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/RenewalOperation' }
+        '400': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /api/me/subscriptions/{id}/renewals/{operationId}:
+    parameters:
+      - $ref: '#/components/parameters/SubscriptionId'
+      - name: operationId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getRenewalStatus
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/RenewalOperation' }
+        '404': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
   /api/me/top-ups/options:
     get:
       operationId: getTopUpOptions
@@ -169,6 +215,11 @@ components:
     bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
     refreshCookie: { type: apiKey, in: cookie, name: __Host-config_shop_refresh }
   parameters:
+    SubscriptionId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
     Csrf:
       name: X-CSRF-Protection
       in: header
@@ -181,6 +232,11 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/EmailRequest' }
   responses:
+    RenewalOperation:
+      description: The stored outcome or current state of a renewal attempt
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/RenewalOperation' }
     TopUp:
       description: The current state of the payment attempt
       content:
@@ -202,6 +258,48 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/ApiError' }
   schemas:
+    RenewalOptions:
+      type: object
+      required: [currentExpiresAt, deviceLimit, estimated, options]
+      properties:
+        currentExpiresAt: { type: string, format: date-time }
+        deviceLimit: { type: integer }
+        estimated:
+          type: boolean
+          description: For an expired subscription, the actual start is the time of debit.
+        options:
+          type: array
+          items:
+            type: object
+            required: [days, price, expiresAt]
+            properties:
+              days: { type: integer, enum: [30, 90, 180, 360] }
+              price: { type: integer, format: int64, minimum: 0 }
+              expiresAt: { type: string, format: date-time }
+    RenewalRequest:
+      type: object
+      required: [id, days, price, currentExpiresAt, deviceLimit]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Client-generated idempotency key reused with the same request.
+        days: { type: integer, enum: [30, 90, 180, 360] }
+        price: { type: integer, format: int64, minimum: 0 }
+        currentExpiresAt: { type: string, format: date-time }
+        deviceLimit: { type: integer, minimum: 1 }
+    RenewalOperation:
+      type: object
+      required: [id, price, status, charged]
+      properties:
+        id: { type: string, format: uuid }
+        price: { type: integer, format: int64, minimum: 0 }
+        status:
+          type: string
+          enum: [PREPARING, APPLYING, APPLIED, COMPLETED, TERMS_CHANGED, INSUFFICIENT_BALANCE, MANUAL_REVIEW]
+        charged: { type: boolean }
+        expiresAt: { type: string, format: date-time, nullable: true }
+        supportUrl: { type: string, format: uri, nullable: true }
     TopUpRequest:
       type: object
       required: [id, amount, paymentMethod]

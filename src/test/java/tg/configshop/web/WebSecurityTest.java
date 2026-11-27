@@ -24,8 +24,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 import tg.configshop.alerting.AlertService;
+import tg.configshop.constants.SubscriptionChangeStatus;
 import tg.configshop.dto.PaymentLimits;
 import tg.configshop.dto.PlategaCallback;
+import tg.configshop.dto.RenewalOperation;
+import tg.configshop.dto.RenewalTerms;
 import tg.configshop.dto.TopUpView;
 import tg.configshop.external_api.remnawave.webhook.InvalidRemnawaveWebhookSignatureException;
 import tg.configshop.external_api.remnawave.webhook.RemnawaveWebhookController;
@@ -35,6 +38,7 @@ import tg.configshop.repositories.WebUserRepository;
 import tg.configshop.services.ExternalTrafficService;
 import tg.configshop.services.PaymentService;
 import tg.configshop.services.PlategaCallbackService;
+import tg.configshop.services.SubscriptionChangeService;
 import tg.configshop.telegram.bot.WebhookBot;
 import tg.configshop.telegram.bot.WebhookController;
 import tg.configshop.telegram.config.TelegramWebhookSecret;
@@ -67,7 +71,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 })
 @Import({WebSecurityConfig.class, WebJwtAuthenticationConverter.class, RemnawaveWebhookController.class,
         WebhookController.class, TelegramWebhookSecret.class, WebSecurityTest.TestRoutes.class,
-        PlategaWebhookController.class, WebTopUpController.class, WebAuthExceptionHandler.class})
+        PlategaWebhookController.class, WebTopUpController.class, WebRenewalController.class, WebAuthExceptionHandler.class})
 @ActiveProfiles("dev")
 class WebSecurityTest {
     static final String SECRET_BASE64 = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWYwMTIzNDU2Nzg5YWJjZGVmMDEyMzQ1Njc4OWFiY2RlZg==";
@@ -84,6 +88,7 @@ class WebSecurityTest {
     @MockitoBean AlertService alerts;
     @MockitoBean PlategaCallbackService paymentCallbacks;
     @MockitoBean PaymentService payments;
+    @MockitoBean SubscriptionChangeService renewals;
 
     @BeforeEach
     void user() {
@@ -139,6 +144,36 @@ class WebSecurityTest {
                 .andExpect(status().isOk()).andExpect(content().string(""));
         verify(paymentCallbacks).applyCallback(callback);
         mvc.perform(get("/api/webhooks/platega")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void webRenewalUsesBearerAccountAndSubscriptionAndValidatesTheRequest() throws Exception {
+        var subscription = UUID.randomUUID();
+        var operation = UUID.randomUUID();
+        var expiry = Instant.parse("2090-01-01T00:00:00Z");
+        var path = "/api/me/subscriptions/" + subscription + "/renewals";
+        var authorization = "Bearer " + sign(validClaims().build());
+        var body = """
+                {"id":"%s","days":%s,"deviceLimit":2,"price":110,"currentExpiresAt":"%s"}
+                """;
+        mvc.perform(get(path + "/" + operation)).andExpect(status().isUnauthorized());
+        mvc.perform(post(path).header(HttpHeaders.AUTHORIZATION, authorization).contentType(MediaType.APPLICATION_JSON)
+                        .content(body.formatted(operation, "30.5", expiry)))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.error").value("invalid_renewal"));
+        verifyNoInteractions(renewals);
+
+        var terms = new RenewalTerms(30, 2, 110, expiry);
+        when(renewals.confirmRenewal(operation, ACCOUNT_ID, subscription, terms))
+                .thenReturn(new RenewalOperation(operation, 110, SubscriptionChangeStatus.TERMS_CHANGED, false, null));
+        mvc.perform(post(path).header(HttpHeaders.AUTHORIZATION, authorization).contentType(MediaType.APPLICATION_JSON)
+                        .content(body.formatted(operation, "30", expiry)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(operation.toString()))
+                .andExpect(jsonPath("$.status").value("TERMS_CHANGED"))
+                .andExpect(jsonPath("$.charged").value(false));
+        mvc.perform(get(path + "/" + operation).header(HttpHeaders.AUTHORIZATION, authorization))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.error").value("renewal_not_found"));
+        verify(renewals).renewalStatus(operation, ACCOUNT_ID, subscription);
     }
 
     @Test

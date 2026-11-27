@@ -43,13 +43,15 @@ class RemnawavePurchaseValidationTest {
         when(subscriptions.requireOwned(accountId, subscriptionId)).thenReturn(invalid);
         var client = mock(RemnawaveClient.class);
         var scheduler = mock(SchedulerService.class);
-        var service = new tg.configshop.services.impl.SubscriptionServiceImpl(changes(client, version, scheduler));
+        var service = new tg.configshop.services.impl.SubscriptionServiceImpl(changes(client, version, scheduler),
+                mock(SubscriptionPricing.class));
         assertThrows(IllegalArgumentException.class, () -> service.buySubscription(accountId, subscriptionId, 30, 1));
         verifyNoInteractions(balance, scheduler, client);
     }
 
     private SubscriptionChangeService changes(RemnawaveClient client, int version, SchedulerService scheduler) {
         return new SubscriptionChangeService(mock(PlatformTransactionManager.class), mock(SubscriptionChangeRepository.class),
-                subscriptions, mock(AccountRepository.class), balance, client, new RemnawaveApiVersion(version), scheduler);
+                subscriptions, mock(AccountRepository.class), balance, mock(SubscriptionPricing.class),
+                client, new RemnawaveApiVersion(version), scheduler);
     }
 }

@@ -28,10 +28,12 @@ public class SubscriptionChange {
     @Enumerated(EnumType.STRING)
     private SubscriptionChangeStatus status;
     private UUID purchaseId;
+    private Instant expectedExpiry;
     private Instant previousExpiry;
     private Integer previousDevices;
     private Instant targetExpiry;
     private Integer targetDevices;
+    private boolean expiryConfirmed;
     private int attempts;
     private Instant nextAttemptAt;
     private String lastError;

@@ -42,6 +42,7 @@ import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 import tg.configshop.constants.*;
 import tg.configshop.dto.PlategaCallback;
+import tg.configshop.dto.RenewalTerms;
 import tg.configshop.dto.TopUpView;
 import tg.configshop.dto.WithdrawalRequest;
 import tg.configshop.external_api.remnawave.RemnawaveClient;
@@ -724,7 +725,7 @@ class AccountOperationsTest {
         jdbc.update("update subscription_changes set next_attempt_at = now() where id = ?", operation);
         var restartedService = new SubscriptionChangeService(bean(PlatformTransactionManager.class),
                 bean(SubscriptionChangeRepository.class), bean(SubscriptionAccessService.class),
-                bean(AccountRepository.class), balance, panel,
+                bean(AccountRepository.class), balance, bean(SubscriptionPricing.class), panel,
                 bean(tg.configshop.external_api.remnawave.config.RemnawaveApiVersion.class),
                 bean(tg.configshop.quartz.services.SchedulerService.class));
         new SubscriptionChangeWorker(bean(SubscriptionChangeRepository.class), restartedService).retryPending();
@@ -762,6 +763,86 @@ class AccountOperationsTest {
         assertEquals(0, bean(PurchaseRepository.class).count());
         assertEquals(0, bean(BalanceLogRepository.class).count());
         verify(panel, never()).updateSubscription(any(), any(), anyInt());
+    }
+
+    @ParameterizedTest @ValueSource(strings = {"expiry", "devices", "price"})
+    void webRenewalRejectsChangedTermsDuringBackgroundPreparation(String changedTerm) {
+        var owner = accountId(10);
+        var subscription = buyer.getSubscription();
+        credit(buyer, 400);
+        var renewal = bean(SubscriptionChangeService.class);
+        var panel = bean(RemnawaveClient.class);
+        var expiry = Instant.parse("2090-01-01T00:00:00Z");
+        var initial = RemnawaveUserResponse.builder().id(10L).expireAt(expiry).hwidDeviceLimit(2).build();
+        var updated = RemnawaveUserResponse.builder().id(10L)
+                .expireAt(changedTerm.equals("expiry") ? expiry.plusSeconds(86400) : expiry)
+                .hwidDeviceLimit(changedTerm.equals("devices") ? 3 : 2).build();
+        when(panel.getUser(subscription.remnawaveRef())).thenReturn(initial)
+                .thenThrow(new ResourceAccessException("timeout")).thenReturn(updated);
+
+        var quote = renewal.renewalOptions(owner, subscription.getId());
+        var option = quote.options().getFirst();
+        assertEquals(List.of(30, 90, 180, 360), quote.options().stream().map(item -> item.days()).toList());
+        assertEquals(110, option.price());
+        assertEquals(expiry.plusSeconds(30L * 86400), option.expiresAt());
+        var terms = new RenewalTerms(option.days(), quote.deviceLimit(), option.price(), quote.currentExpiresAt());
+        var operation = UUID.randomUUID();
+        assertEquals(SubscriptionChangeStatus.PREPARING, renewal.confirmRenewal(operation, owner, subscription.getId(), terms).status());
+
+        if (changedTerm.equals("price")) {
+            ReflectionTestUtils.setField(bean(SubscriptionPricing.class), "BASE_PRICE_FOR_1_MONTH", 120);
+        }
+        jdbc.update("update subscription_changes set next_attempt_at = now() where id = ?", operation);
+        bean(SubscriptionChangeWorker.class).retryPending();
+
+        var result = renewal.renewalStatus(operation, owner, subscription.getId()).orElseThrow();
+        assertEquals(SubscriptionChangeStatus.TERMS_CHANGED, result.status());
+        assertFalse(result.charged());
+        assertFalse(bean(SubscriptionChangeRepository.class)
+                .existsBySubscriptionIdAndStatusIn(subscription.getId(), SubscriptionChangeStatus.ACTIVE));
+        assertEquals(400, balance.balance(owner));
+        assertEquals(0, bean(PurchaseRepository.class).count());
+        verify(panel, never()).updateSubscription(any(), any(), anyInt());
+    }
+
+    @Test void webRenewalOfExpiredSubscriptionIsChargedOnceAndStatusFollowsItsOwner() {
+        var owner = accountId(10);
+        var account = buyer.getAccount();
+        var first = buyer.getSubscription();
+        var second = bean(RemnawaveSubscriptionRepository.class).saveAndFlush(
+                RemnawaveSubscription.builder().account(account).remnawaveId(501L).build());
+        credit(buyer, 400);
+        var panel = bean(RemnawaveClient.class);
+        var expiry = Instant.parse("2020-01-01T00:00:00Z");
+        when(panel.getUser(second.remnawaveRef())).thenReturn(
+                RemnawaveUserResponse.builder().id(501L).expireAt(expiry).hwidDeviceLimit(2).build());
+        when(panel.updateSubscription(eq(second.remnawaveRef()), any(), eq(2))).thenAnswer(call -> {
+            assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
+            return RemnawaveUserResponse.builder().id(501L).expireAt(call.getArgument(1)).hwidDeviceLimit(2).build();
+        });
+
+        var renewal = bean(SubscriptionChangeService.class);
+        assertTrue(renewal.renewalOptions(owner, second.getId()).estimated());
+        var operation = UUID.randomUUID();
+        var terms = new RenewalTerms(30, 2, 110, expiry);
+        var earliest = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MILLIS).plusSeconds(30L * 86400);
+        var confirmed = renewal.confirmRenewal(operation, owner, second.getId(), terms);
+        assertEquals(SubscriptionChangeStatus.COMPLETED, confirmed.status());
+        assertTrue(confirmed.charged());
+        assertFalse(confirmed.expiresAt().isBefore(earliest));
+        assertFalse(confirmed.expiresAt().isAfter(Instant.now().plusSeconds(30L * 86400)));
+        assertEquals(confirmed, renewal.confirmRenewal(operation, owner, second.getId(), terms));
+        assertThrows(IllegalArgumentException.class, () -> renewal.confirmRenewal(operation, owner, second.getId(),
+                new RenewalTerms(30, 2, 100, expiry)));
+        assertTrue(renewal.renewalStatus(operation, owner, first.getId()).isEmpty());
+        assertTrue(renewal.renewalStatus(operation, UUID.randomUUID(), second.getId()).isEmpty());
+        var currentOwner = moveAccount(owner);
+        assertTrue(renewal.renewalStatus(operation, owner, second.getId()).isEmpty());
+        assertEquals(confirmed, renewal.renewalStatus(operation, currentOwner, second.getId()).orElseThrow());
+        assertEquals(290, balance.balance(currentOwner));
+        assertEquals(1, bean(PurchaseRepository.class).count());
+        verify(panel).updateSubscription(second.remnawaveRef(), confirmed.expiresAt(), 2);
+        verify(panel, never()).getUser(first.remnawaveRef());
     }
 
     @Test void devicePurchaseKeepsLegacyPricingAndWritesOneLedgerEntry() {
@@ -839,7 +920,7 @@ class AccountOperationsTest {
     @EnableJpaRepositories(basePackages = {"tg.configshop.repositories", "tg.configshop.external_api.pay.repositories"})
     @Import({BalanceServiceImpl.class, AccountService.class, SubscriptionAccessService.class, ReferralServiceImpl.class, PromoCodeServiceImpl.class,
             WithdrawalService.class, PaymentServiceImpl.class, PaymentPollingService.class, PaymentConfirmedListener.class, OperationsService.class,
-            SubscriptionServiceImpl.class, TrafficPackageServiceImpl.class, DeviceService.class, DevicePurchaseService.class,
+            SubscriptionServiceImpl.class, SubscriptionPricing.class, TrafficPackageServiceImpl.class, DeviceService.class, DevicePurchaseService.class,
             ExternalSubscriptionService.class, RegistrationServiceImpl.class, SubscriptionChangeService.class,
             SubscriptionChangeWorker.class, AccountMergeService.class})
     static class Config {

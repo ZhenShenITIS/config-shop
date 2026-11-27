@@ -19,10 +19,24 @@ const statusText: Record<TopUp['state'], string> = {
   MANUAL_REVIEW: 'Платёж требует проверки. Если вы уже оплатили, сохраните номер заявки для поддержки.',
 };
 
-export function TopUpAction() {
+type TopUpActionProps = {
+  renewalAmount?: number;
+  onRenewalClose: () => void;
+  onRenewalCreated: (id: string) => void;
+  onConfirmed: (id: string) => void;
+};
+
+export function TopUpAction({ renewalAmount, onRenewalClose, onRenewalCreated, onConfirmed }: TopUpActionProps) {
   const [opened, setOpened] = useState(false);
   const [params, setParams] = useSearchParams();
   const id = params.get('topUp');
+  const forRenewal = renewalAmount !== undefined;
+  const showForm = opened || forRenewal;
+
+  function close() {
+    setOpened(false);
+    if (forRenewal) onRenewalClose();
+  }
 
   function showStatus(nextId?: string) {
     setParams(current => {
@@ -35,31 +49,35 @@ export function TopUpAction() {
 
   return <Stack gap="sm" mt="sm" align="flex-start">
     {id && (uuid.test(id)
-      ? <TopUpStatus key={id} id={id} dismiss={() => showStatus()} />
+      ? <TopUpStatus key={id} id={id} dismiss={() => showStatus()} onConfirmed={onConfirmed} />
       : <Alert color="red">Номер платежа недействителен.</Alert>)}
     <Button variant="light" onClick={() => setOpened(true)}>Пополнить</Button>
-    <Modal opened={opened} onClose={() => setOpened(false)} title="Пополнить баланс" centered>
-      {opened && <TopUpFormLoader onCreated={payment => {
+    <Modal opened={showForm} onClose={close} title="Пополнить баланс" centered>
+      {showForm && <TopUpFormLoader suggestedAmount={renewalAmount} onCreated={payment => {
+        if (forRenewal) onRenewalCreated(payment.id);
         showStatus(payment.id);
-        setOpened(false);
+        close();
         if (payment.state === 'PENDING' && payment.redirect) window.location.assign(payment.redirect);
       }} />}
     </Modal>
   </Stack>;
 }
 
-function TopUpFormLoader({ onCreated }: { onCreated: (payment: TopUp) => void }) {
+type TopUpFormProps = { suggestedAmount?: number; onCreated: (payment: TopUp) => void };
+
+function TopUpFormLoader(props: TopUpFormProps) {
   const options = useGetTopUpOptions();
   if (options.isPending) return <Loader aria-label="Загружаем способы оплаты" size="sm" />;
   if (!options.data) return <Stack align="flex-start">
     <ErrorAlert error={options.error} />
     <Button variant="light" loading={options.isFetching} onClick={() => void options.refetch()}>Повторить</Button>
   </Stack>;
-  return <TopUpForm options={options.data} onCreated={onCreated} />;
+  return <TopUpForm options={options.data} {...props} />;
 }
 
-function TopUpForm({ options, onCreated }: { options: TopUpOptions; onCreated: (payment: TopUp) => void }) {
-  const [amount, setAmount] = useState<number | string>('');
+function TopUpForm({ options, suggestedAmount, onCreated }: TopUpFormProps & { options: TopUpOptions }) {
+  const [amount, setAmount] = useState<number | string>(suggestedAmount === undefined
+    ? '' : Math.min(options.maximum, Math.max(options.minimum, suggestedAmount)));
   const [method, setMethod] = useState(String(options.defaultMethod));
   const attempt = useRef<TopUpRequest | null>(null);
   const creation = useCreateTopUp();
@@ -100,8 +118,9 @@ function TopUpForm({ options, onCreated }: { options: TopUpOptions; onCreated: (
   </form>;
 }
 
-function TopUpStatus({ id, dismiss }: { id: string; dismiss: () => void }) {
+function TopUpStatus({ id, dismiss, onConfirmed }: { id: string; dismiss: () => void; onConfirmed: (id: string) => void }) {
   const client = useQueryClient();
+  const confirmed = useRef(false);
   const payment = useGetTopUp(id, { query: {
     refetchInterval: query => {
       switch (query.state.data?.state) {
@@ -116,8 +135,11 @@ function TopUpStatus({ id, dismiss }: { id: string; dismiss: () => void }) {
   const state = payment.data?.state;
 
   useEffect(() => {
-    if (state === 'CONFIRMED') void client.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
-  }, [client, state]);
+    if (state !== 'CONFIRMED' || confirmed.current) return;
+    confirmed.current = true;
+    void client.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+    onConfirmed(id);
+  }, [client, id, onConfirmed, state]);
 
   if (payment.isPending) return <Loader aria-label="Проверяем платёж" size="sm" />;
   if (!payment.data) return <Stack gap="xs">

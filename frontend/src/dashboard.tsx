@@ -2,14 +2,15 @@ import { Alert, Badge, Button, Group, Loader, Paper, Progress, SegmentedControl,
 import { notifications } from '@mantine/notifications';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowDownToLine, Copy, LogOut, Radio, Send, Wallet } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import {
-  logout, useGetDashboard, useGetSubscription, useIssueTelegramCode,
-  type Dashboard,
+  getGetRenewalOptionsQueryKey, logout, useGetDashboard, useGetSubscription, useIssueTelegramCode,
+  type Dashboard, type RenewalRequest,
 } from './api/generated/configShop';
 import { ApiError, setSession, withSessionLock } from './api/http';
 import { ErrorAlert } from './auth';
+import { loadRenewalDrafts, RenewalDialog, storeRenewalDrafts, type RenewalDraft } from './renewal';
 import { TopUpAction } from './top-up';
 
 const rubles = new Intl.NumberFormat('ru-RU', {
@@ -40,11 +41,71 @@ export function DashboardPage() {
 }
 
 function DashboardView({ account }: { account: Dashboard }) {
-  const [selected, setSelected] = useState<string>();
+  const [search] = useSearchParams();
+  const [drafts, setDrafts] = useState(() => loadRenewalDrafts(account.accountId));
+  const draftsRef = useRef(drafts);
+  const returning = account.subscriptions.find(({ id }) => search.has('topUp') && drafts[id]?.topUpId === search.get('topUp'));
+  const [renewalId, setRenewalId] = useState(() => returning ? undefined
+    : account.subscriptions.find(({ id }) => drafts[id]?.attempt)?.id);
+  const [selected, setSelected] = useState(returning?.id ?? renewalId);
+  const [renewalTopUp, setRenewalTopUp] = useState<{ subscriptionId: string; amount: number }>();
   const [leaving, setLeaving] = useState(false);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const subscription = account.subscriptions.find(({ id }) => id === selected) ?? account.subscriptions[0];
+
+  function saveDraft(id: string, draft: RenewalDraft) {
+    const next = { ...draftsRef.current, [id]: draft };
+    storeRenewalDrafts(account.accountId, next);
+    draftsRef.current = next;
+    setDrafts(next);
+  }
+
+  function showStorageError() {
+    notifications.show({ color: 'red', message: 'Не удалось сохранить данные продления в браузере.' });
+  }
+
+  function openRenewal(id: string) {
+    try {
+      if (!draftsRef.current[id]) saveDraft(id, {});
+      setRenewalId(id);
+    } catch {
+      showStorageError();
+    }
+  }
+
+  function openRenewalTopUp(subscriptionId: string, days: RenewalRequest['days'], amount: number) {
+    try {
+      saveDraft(subscriptionId, { days });
+      setRenewalId(undefined);
+      setRenewalTopUp({ subscriptionId, amount });
+    } catch {
+      showStorageError();
+    }
+  }
+
+  function attachTopUp(topUpId: string) {
+    if (!renewalTopUp) return;
+    const id = renewalTopUp.subscriptionId;
+    try {
+      saveDraft(id, { ...draftsRef.current[id], topUpId });
+    } catch {
+      showStorageError();
+    }
+  }
+
+  function resumeAfterTopUp(topUpId: string) {
+    const item = account.subscriptions.find(({ id }) => draftsRef.current[id]?.topUpId === topUpId);
+    if (!item) return;
+    try {
+      saveDraft(item.id, { days: draftsRef.current[item.id].days });
+    } catch {
+      showStorageError();
+    }
+    void queryClient.invalidateQueries({ queryKey: getGetRenewalOptionsQueryKey(item.id) });
+    setSelected(item.id);
+    setRenewalId(item.id);
+  }
 
   async function signOut() {
     setLeaving(true);
@@ -75,7 +136,8 @@ function DashboardView({ account }: { account: Dashboard }) {
         <span className="tile-icon"><Wallet size={20} /></span>
         <Text mt="md" c="dimmed">Баланс</Text>
         <Text className="balance-value">{rubles.format(account.balance)}</Text>
-        <TopUpAction />
+        <TopUpAction renewalAmount={renewalTopUp?.amount} onRenewalClose={() => setRenewalTopUp(undefined)}
+          onRenewalCreated={attachTopUp} onConfirmed={resumeAfterTopUp} />
       </Paper>
       <Paper className="dashboard-card" withBorder radius="lg">
         <span className="tile-icon"><Send size={19} /></span>
@@ -95,19 +157,30 @@ function DashboardView({ account }: { account: Dashboard }) {
           data={account.subscriptions.map(({ id }, index) => ({ value: id, label: 'Подписка ' + (index + 1) }))}
         />}
         {subscription
-          ? <SubscriptionView key={subscription.id} id={subscription.id} />
+          ? <SubscriptionView key={subscription.id} id={subscription.id}
+              hasRenewal={Boolean(drafts[subscription.id]?.attempt)} renew={() => openRenewal(subscription.id)} />
           : <Text c="dimmed">У вас пока нет подписок.</Text>}
       </Stack>
     </Paper>
+    {account.subscriptions.map(({ id }, index) => drafts[id] && (
+      <RenewalDialog key={id} id={id} balance={account.balance} draft={drafts[id]}
+        title={account.subscriptions.length > 1 ? 'Продление подписки ' + (index + 1) : 'Продление подписки'}
+        opened={renewalId === id} onChange={draft => saveDraft(id, draft)} onClose={() => setRenewalId(undefined)}
+        onTopUp={(days, amount) => openRenewalTopUp(id, days, amount)} />
+    ))}
   </Stack>;
 }
 
-function SubscriptionView({ id }: { id: string }) {
+function SubscriptionView({ id, hasRenewal, renew }: { id: string; hasRenewal: boolean; renew: () => void }) {
   const subscription = useGetSubscription(id);
+  const renewButton = <Button variant="light" onClick={renew}>
+    {hasRenewal ? 'Проверить продление' : 'Продлить'}
+  </Button>;
   if (subscription.isPending) return <Loader aria-label="Загружаем подписку" size="sm" />;
   if (!subscription.data) return <Stack align="flex-start">
     <ErrorAlert error={subscription.error} />
     <Button variant="light" onClick={() => void subscription.refetch()} loading={subscription.isFetching}>Повторить</Button>
+    {hasRenewal && renewButton}
   </Stack>;
 
   const { active, expiresAt, usedTrafficGb, trafficLimitGb, connectionUrl } = subscription.data;
@@ -128,6 +201,7 @@ function SubscriptionView({ id }: { id: string }) {
           aria-label="Использовано трафика" />}
       </div>
     </div>
+    <Group>{renewButton}</Group>
     {link ? (
       <div className="connection-panel">
         <Stack gap="sm">
