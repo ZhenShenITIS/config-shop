@@ -36,7 +36,9 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   const isRegister = mode === 'register';
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const nextPage = search.get('next') === '/link-telegram.html' ? '/link-telegram.html' : '/dashboard';
+  const topUp = search.get('topUp');
+  const nextPage = search.get('next') === '/link-telegram.html' ? '/link-telegram.html'
+    : { pathname: '/dashboard', search: topUp ? new URLSearchParams({ topUp }).toString() : '' };
   const login = useLogin();
   const register = useRegister();
   const form = useForm({

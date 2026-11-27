@@ -82,7 +82,22 @@ public class PaymentStage implements DialogStage {
             return;
         }
         stateRepository.put(userId, DialogStageName.NONE);
-        PaymentView plategaPayment = paymentService.createPlategaPayment(amount, stateRepository.getPaymentContext(userId).paymentMethod().getIntMethod(), userService.accountId(userId), "https://t.me/" + botUsername, "https://t.me/" + botUsername);
+        String botUrl = "https://t.me/" + botUsername;
+        var requestId = java.util.UUID.nameUUIDFromBytes(("telegram-payment:" + chatId + ":" + message.getMessageId())
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        PaymentView plategaPayment = paymentService.createTopUp(requestId, amount,
+                stateRepository.getPaymentContext(userId).paymentMethod().getIntMethod(), userService.accountId(userId),
+                userId + "@telegram.org", botUrl, botUrl);
+        if (plategaPayment.redirect() == null || plategaPayment.transactionId() == null) {
+            try {
+                telegramClient.execute(SendMessage.builder().chatId(chatId)
+                        .text("Ссылка на оплату пока недоступна. Если вы уже оплатили, проверьте баланс позднее.")
+                        .build());
+            } catch (TelegramApiException e) {
+                throw new IllegalStateException("Could not send payment status", e);
+            }
+            return;
+        }
 
         String shortId = plategaPayment.transactionId().split("-")[0];
 

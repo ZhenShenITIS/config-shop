@@ -73,15 +73,20 @@ function Home() {
 
 function RequireSession() {
   const session = useSession();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   if (session === 'loading') return <Loader aria-label="Проверяем сеанс" />;
   if (session === 'unavailable') {
     return <Alert color="red" title="Не удалось проверить сеанс">
       <Button variant="subtle" onClick={() => void restoreSession().catch(() => undefined)}>Повторить</Button>
     </Alert>;
   }
-  if (session === 'anonymous') return <Navigate to={pathname === '/link-telegram.html'
-    ? '/login?next=%2Flink-telegram.html' : '/login'} replace />;
+  if (session === 'anonymous') {
+    const login = new URLSearchParams();
+    if (pathname === '/link-telegram.html') login.set('next', pathname);
+    const topUp = new URLSearchParams(search).get('topUp');
+    if (pathname === '/dashboard' && topUp) login.set('topUp', topUp);
+    return <Navigate to={{ pathname: '/login', search: login.toString() }} replace />;
+  }
   return <Outlet />;
 }
 

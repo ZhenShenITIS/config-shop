@@ -95,7 +95,8 @@ public class WebSecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/confirm-email",
                                 "/api/auth/resend-confirmation", "/api/auth/login", "/api/auth/refresh",
-                                "/api/auth/logout", "/api/auth/forgot-password", "/api/auth/reset-password").permitAll()
+                                "/api/auth/logout", "/api/auth/forgot-password", "/api/auth/reset-password",
+                                "/api/webhooks/platega").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(errors -> errors.authenticationEntryPoint(UNAUTHORIZED).accessDeniedHandler(FORBIDDEN))
                 .oauth2ResourceServer(resource -> resource

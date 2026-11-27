@@ -4,6 +4,7 @@ import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import tg.configshop.external_api.pay.model.PlategaPayment;
 import tg.configshop.external_api.pay.constants.PaymentStatus;
@@ -16,7 +17,7 @@ import java.util.UUID;
 public interface PlategaPaymentRepository extends JpaRepository<PlategaPayment, java.util.UUID> {
     String SNAPSHOT = """
             SELECT p.id AS id, p.transactionId AS providerPaymentId, p.account.id AS accountId,
-                   p.createdAt AS createdAt, p.status AS status FROM PlategaPayment p
+                   p.createdAt AS createdAt, p.updatedAt AS updatedAt, p.status AS status FROM PlategaPayment p
             """;
     String PENDING = SNAPSHOT + """
             WHERE p.status = tg.configshop.external_api.pay.constants.PaymentStatus.PENDING
@@ -26,6 +27,23 @@ public interface PlategaPaymentRepository extends JpaRepository<PlategaPayment, 
 
     @Query(SNAPSHOT + " WHERE p.transactionId = :id")
     Optional<PaymentSnapshot> findForCheck(String id);
+
+    Optional<PlategaPayment> findByRequestIdAndAccount_Id(UUID requestId, UUID accountId);
+
+    @Modifying
+    @Query(value = """
+            INSERT INTO platega_payments (account_id, request_id, amount, currency, payment_method, status)
+            VALUES (:accountId, :requestId, :amount, 'RUB', :method, 'CREATING')
+            ON CONFLICT (request_id) DO NOTHING
+            """, nativeQuery = true)
+    int reserve(UUID accountId, UUID requestId, long amount, String method);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM PlategaPayment p WHERE p.requestId = :requestId")
+    Optional<PlategaPayment> findByRequestIdWithLock(UUID requestId);
+
+    @Query("SELECT p.account.id FROM PlategaPayment p WHERE p.requestId = :requestId")
+    Optional<UUID> findOwnerByRequestId(UUID requestId);
 
     @Query(PENDING + " ORDER BY p.createdAt, p.id")
     List<PaymentSnapshot> findPending(Instant createdBefore, Pageable pageable);
@@ -41,6 +59,7 @@ public interface PlategaPaymentRepository extends JpaRepository<PlategaPayment, 
         String getProviderPaymentId();
         UUID getAccountId();
         Instant getCreatedAt();
+        Instant getUpdatedAt();
         PaymentStatus getStatus();
     }
 

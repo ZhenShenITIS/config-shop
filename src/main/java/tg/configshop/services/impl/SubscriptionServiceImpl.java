@@ -1,33 +1,24 @@
 package tg.configshop.services.impl;
 
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import tg.configshop.events.SubscriptionPaidEvent;
+import tg.configshop.dto.SubscriptionChangeResult;
 import tg.configshop.exceptions.subscription.InsufficientBalanceException;
+import tg.configshop.exceptions.subscription.SubscriptionChangeInProgressException;
 import tg.configshop.exceptions.subscription.SubscriptionNotFoundException;
-import tg.configshop.external_api.remnawave.RemnawaveClient;
-import tg.configshop.external_api.remnawave.config.RemnawaveApiVersion;
-import tg.configshop.model.Purchase;
 import tg.configshop.model.Subscription;
-import tg.configshop.quartz.services.SchedulerService;
-import tg.configshop.services.BalanceService;
 import tg.configshop.services.SubscriptionService;
+import tg.configshop.services.SubscriptionChangeService;
 
-import java.time.Instant;
+import java.util.UUID;
 
-@Slf4j
+
 @Service
 @RequiredArgsConstructor
 public class SubscriptionServiceImpl implements SubscriptionService {
-    private final BalanceService balanceService;
-    private final tg.configshop.services.SubscriptionAccessService subscriptions;
-    private final RemnawaveClient remnawaveClient;
-    private final ApplicationEventPublisher applicationEventPublisher;
-    private final RemnawaveApiVersion apiVersion;
+    private final SubscriptionChangeService changes;
+
     @Value("${MIN_DEVICE_COUNT}")
     private int MIN_DEVICE_COUNT;
 
@@ -62,30 +53,20 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     private int TRAFFIC_LIMIT_PER_DEVICE;
 
 
-    private final SchedulerService schedulerService;
+    @Override
+    public void buySubscription(UUID accountId, UUID subscriptionId, int days, int devices) {
+        var purchase = renewSubscription(UUID.randomUUID(), accountId, subscriptionId, days, devices);
+        switch (purchase.status()) {
+            case COMPLETED -> { }
+            case INSUFFICIENT_BALANCE -> throw new InsufficientBalanceException();
+            default -> throw new SubscriptionChangeInProgressException();
+        }
+    }
 
     @Override
-    @Transactional
-    public void buySubscription(java.util.UUID accountId, java.util.UUID subscriptionId, int days, int devices) throws InsufficientBalanceException {
-        var owned = subscriptions.requireOwned(accountId, subscriptionId);
-        Subscription subscription = getSubscriptionByDaysAndDevices(days, devices);
-        apiVersion.select(owned.remnawaveRef());
-        Instant currentExpiry = remnawaveClient.getUser(owned.remnawaveRef()).expireAt();
-        Instant now = Instant.now();
-        Instant newExpired = (currentExpiry.isAfter(now) ? currentExpiry : now)
-                .plusSeconds(days * 86400L);
-        balanceService.purchase(Purchase.builder().account(owned.getAccount())
-                .remnawaveSubscription(owned).paidAmount(subscription.getCost())
-                .accountPriceRate(java.math.BigDecimal.ONE)
-                .subDays(days).subDevices(devices).build());
-
-        applicationEventPublisher.publishEvent(new SubscriptionPaidEvent(accountId, subscriptionId, subscription.getDeviceCount(), newExpired));
-
-
-
-        schedulerService.scheduleSubscriptionNotifications(accountId, subscriptionId, newExpired);
-
-
+    public SubscriptionChangeResult renewSubscription(UUID id, UUID accountId, UUID subscriptionId, int days, int devices) {
+        return changes.renew(id, accountId, subscriptionId, days, devices,
+                () -> getSubscriptionByDaysAndDevices(days, devices).getCost());
     }
 
     @Override

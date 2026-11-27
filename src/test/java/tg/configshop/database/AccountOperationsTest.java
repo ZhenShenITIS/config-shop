@@ -41,7 +41,11 @@ import org.telegram.telegrambots.meta.api.objects.User;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 import tg.configshop.constants.*;
+import tg.configshop.dto.PlategaCallback;
+import tg.configshop.dto.TopUpView;
 import tg.configshop.dto.WithdrawalRequest;
+import tg.configshop.external_api.remnawave.RemnawaveClient;
+import tg.configshop.external_api.remnawave.dto.user.RemnawaveUserResponse;
 import tg.configshop.telegram.TelegramUserService;
 import tg.configshop.events.PaymentConfirmedEvent;
 import tg.configshop.external_api.pay.*;
@@ -57,6 +61,7 @@ import tg.configshop.telegram.callbacks.impl.referrals.ReferralCallback;
 
 import javax.sql.DataSource;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -189,6 +194,81 @@ class AccountOperationsTest {
         assertEquals(PaymentMethod.SBP, loaded.getPaymentMethod());
         assertEquals(0, loaded.getAmount().compareTo(new BigDecimal("1000.00")));
     }
+    @Test void callbackRecoversUncertainCreationAndLateConfirmationWithoutDoubleCredit() {
+        var owner = accountId(10);
+        var request = UUID.randomUUID();
+        var providerId = UUID.randomUUID().toString();
+        var provider = bean(PlategaClient.class);
+        String url = "https://example.invalid/dashboard?topUp=" + request;
+        when(provider.createPayment(any())).thenAnswer(invocation -> {
+            assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
+            var sent = invocation.<tg.configshop.external_api.pay.dto.CreatePaymentRequest>getArgument(0);
+            assertEquals("buyer@example.com", sent.metadata().userEmail());
+            assertEquals(url, sent.returnUrl());
+            assertEquals("config-shop:" + request, sent.payload());
+            throw new ResourceAccessException("timeout");
+        });
+
+        var payments = bean(PaymentService.class);
+        for (int i = 0; i < 2; i++) {
+            payments.createTopUp(request, 1000L, 2, owner, "buyer@example.com", url, url);
+        }
+        verify(provider).createPayment(any());
+        assertEquals(TopUpView.State.MANUAL_REVIEW, payments.getTopUp(request, owner).orElseThrow().state());
+        assertTrue(payments.getTopUp(request, user(20).getAccount().getId()).isEmpty());
+
+        var callbacks = bean(PlategaCallbackService.class);
+        var canceled = callback(providerId, "CANCELED", request);
+        var confirmed = callback(providerId, "CONFIRMED", request);
+        callbacks.applyCallback(canceled);
+        assertEquals(TopUpView.State.CANCELED, payments.getTopUp(request, owner).orElseThrow().state());
+        assertThrows(IllegalArgumentException.class, () -> callbacks.applyCallback(
+                new PlategaCallback(providerId, BigDecimal.valueOf(999), "RUB", "CONFIRMED", 2, confirmed.payload())));
+        callbacks.applyCallback(confirmed);
+        callbacks.applyCallback(canceled);
+        callbacks.applyCallback(confirmed);
+        assertEquals(TopUpView.State.CONFIRMED, payments.getTopUp(request, owner).orElseThrow().state());
+        assertEquals(1000, balance.balance(owner));
+        assertEquals(1, bean(TopUpRepository.class).count());
+        assertEquals(1, bean(BalanceLogRepository.class).count());
+        verifyNoMoreInteractions(provider);
+    }
+
+    @Test void callbackWinsRaceWithPollingAndUsesNewOwnerAfterMerge() throws Exception {
+        var retained = accountId(10);
+        var movedUser = user(20);
+        var moved = movedUser.getAccount().getId();
+        var providerId = UUID.randomUUID().toString();
+        payment(movedUser, providerId);
+        var provider = bean(PlategaClient.class);
+        var fetchStarted = new CountDownLatch(1);
+        var releaseFetch = new CountDownLatch(1);
+        when(provider.getPayment(providerId)).thenAnswer(invocation -> {
+            fetchStarted.countDown();
+            assertTrue(releaseFetch.await(10, TimeUnit.SECONDS));
+            return confirmedPayment(providerId);
+        });
+        assertEquals(retained, new TransactionTemplate(bean(PlatformTransactionManager.class))
+                .execute(tx -> bean(AccountMergeService.class).merge(retained, moved)));
+        try (var pool = Executors.newSingleThreadExecutor()) {
+            var polling = pool.submit(() -> bean(PaymentService.class).checkPayment(providerId, retained));
+            try {
+                assertTrue(fetchStarted.await(10, TimeUnit.SECONDS));
+                bean(PlategaCallbackService.class).applyCallback(callback(providerId, "CONFIRMED", null));
+            } finally {
+                releaseFetch.countDown();
+            }
+            assertEquals(PaymentResult.CONFIRMED, polling.get(10, TimeUnit.SECONDS));
+        }
+        assertEquals(1000, balance.balance(retained));
+        assertEquals(1, bean(BalanceLogRepository.class).count());
+    }
+
+    private static PlategaCallback callback(String providerId, String status, UUID request) {
+        return new PlategaCallback(providerId, BigDecimal.valueOf(1000), "RUB", status, 2,
+                request == null ? "legacy" : "config-shop:" + request);
+    }
+
     @Test void paymentAndReferralRewardsAreAtomicAndNotRepeated() {
         var first = user(20); var second = user(30); var third = user(40);
         var referrals = bean(ReferralService.class);
@@ -588,9 +668,12 @@ class AccountOperationsTest {
         var second=bean(RemnawaveSubscriptionRepository.class).saveAndFlush(RemnawaveSubscription.builder().account(account).remnawaveId(502L).build());
         balance.adjustAsAdmin(id,1000);
         var client=bean(tg.configshop.external_api.remnawave.RemnawaveClient.class);
-        var expiry=java.time.Instant.now().plusSeconds(86400);
-        when(client.getUser(second.remnawaveRef())).thenReturn(tg.configshop.external_api.remnawave.dto.user.RemnawaveUserResponse.builder()
+        var expiry=Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MILLIS).plusSeconds(86400);
+        when(client.getUser(second.remnawaveRef())).thenReturn(RemnawaveUserResponse.builder()
                 .id(502L).expireAt(expiry).hwidDeviceLimit(1).build());
+        when(client.updateSubscription(second.remnawaveRef(), expiry.plusSeconds(30L * 86400), 2))
+                .thenReturn(RemnawaveUserResponse.builder().id(502L).expireAt(expiry.plusSeconds(30L * 86400))
+                        .hwidDeviceLimit(2).build());
         bean(SubscriptionService.class).buySubscription(id,second.getId(),30,2);
         assertEquals(890,balance.balance(id));
         var purchase=bean(PurchaseRepository.class).findAll().getFirst();
@@ -598,6 +681,107 @@ class AccountOperationsTest {
         verify(client).updateSubscription(second.remnawaveRef(),expiry.plusSeconds(30L*86400),2);
         verify(client,never()).getUser(first.remnawaveRef());
         assertEquals(2,bean(SubscriptionAccessService.class).list(id).size());
+    }
+
+    @ParameterizedTest @ValueSource(booleans = {true, false})
+    void renewalRecoversAfterTimeoutWithoutChargingOrExtendingTwice(boolean appliedBeforeTimeout) {
+        var operation = UUID.randomUUID();
+        var owner = accountId(10);
+        var subscription = buyer.getSubscription();
+        credit(buyer, 400);
+        var panel = bean(RemnawaveClient.class);
+        var expiry = Instant.parse("2090-01-01T12:00:00Z");
+        var target = expiry.plusSeconds(30 * 86400L);
+        var remotelyApplied = new AtomicBoolean();
+        when(panel.getUser(subscription.remnawaveRef())).thenAnswer(invocation -> {
+            assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
+            return RemnawaveUserResponse.builder().id(10L)
+                    .expireAt(remotelyApplied.get() ? target : expiry)
+                    .hwidDeviceLimit(remotelyApplied.get() ? 2 : 1).build();
+        });
+        when(panel.updateSubscription(subscription.remnawaveRef(), target, 2)).thenAnswer(invocation -> {
+            assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
+            remotelyApplied.set(appliedBeforeTimeout);
+            throw new ResourceAccessException("timeout");
+        }).thenAnswer(invocation -> {
+            remotelyApplied.set(true);
+            return RemnawaveUserResponse.builder().id(10L).expireAt(target).hwidDeviceLimit(2).build();
+        });
+
+        var subscriptions = bean(SubscriptionService.class);
+        assertEquals(SubscriptionChangeStatus.APPLYING,
+                subscriptions.renewSubscription(operation, owner, subscription.getId(), 30, 2).status());
+        assertEquals(SubscriptionChangeStatus.APPLYING,
+                subscriptions.renewSubscription(operation, owner, subscription.getId(), 30, 2).status());
+        assertThrows(tg.configshop.exceptions.subscription.SubscriptionChangeInProgressException.class,
+                () -> subscriptions.renewSubscription(UUID.randomUUID(), owner, subscription.getId(), 30, 2));
+        assertThrows(tg.configshop.exceptions.subscription.SubscriptionChangeInProgressException.class,
+                () -> bean(DevicePurchaseService.class).purchaseDevices(owner, subscription.getId(), 1));
+        assertEquals(290, balance.balance(owner));
+        assertEquals(1, bean(PurchaseRepository.class).count());
+
+        UUID currentOwner = appliedBeforeTimeout ? moveAccount(owner) : owner;
+        jdbc.update("update subscription_changes set next_attempt_at = now() where id = ?", operation);
+        var restartedService = new SubscriptionChangeService(bean(PlatformTransactionManager.class),
+                bean(SubscriptionChangeRepository.class), bean(SubscriptionAccessService.class),
+                bean(AccountRepository.class), balance, panel,
+                bean(tg.configshop.external_api.remnawave.config.RemnawaveApiVersion.class),
+                bean(tg.configshop.quartz.services.SchedulerService.class));
+        new SubscriptionChangeWorker(bean(SubscriptionChangeRepository.class), restartedService).retryPending();
+        assertEquals(SubscriptionChangeStatus.COMPLETED,
+                subscriptions.renewSubscription(operation, currentOwner, subscription.getId(), 30, 2).status());
+        assertThrows(IllegalArgumentException.class,
+                () -> subscriptions.renewSubscription(operation, currentOwner, subscription.getId(), 30, 3));
+        assertEquals(290, balance.balance(currentOwner));
+        assertEquals(1, bean(PurchaseRepository.class).count());
+        assertTrue(remotelyApplied.get());
+        verify(panel, times(appliedBeforeTimeout ? 1 : 2)).updateSubscription(subscription.remnawaveRef(), target, 2);
+        verify(bean(tg.configshop.quartz.services.SchedulerService.class))
+                .rescheduleSubscriptionNotifications(currentOwner, subscription.getId(), target);
+    }
+
+    private UUID moveAccount(UUID currentOwner) {
+        UUID retained = user(20).getAccount().getId();
+        jdbc.update("update accounts set created_at = now() - interval '1 day' where id = ?", retained);
+        return new TransactionTemplate(bean(PlatformTransactionManager.class))
+                .execute(tx -> bean(AccountMergeService.class).merge(retained, currentOwner));
+    }
+
+    @Test void unsuccessfulRenewalDoesNotDebitOrCallPanelUpdate() {
+        var owner = accountId(10);
+        var subscription = buyer.getSubscription();
+        var panel = bean(RemnawaveClient.class);
+        when(panel.getUser(subscription.remnawaveRef())).thenReturn(RemnawaveUserResponse.builder().id(10L)
+                .expireAt(Instant.now().plusSeconds(86400)).hwidDeviceLimit(1).build());
+        var operation = UUID.randomUUID();
+        var service = bean(SubscriptionService.class);
+        assertEquals(SubscriptionChangeStatus.INSUFFICIENT_BALANCE,
+                service.renewSubscription(operation, owner, subscription.getId(), 30, 2).status());
+        assertEquals(SubscriptionChangeStatus.INSUFFICIENT_BALANCE,
+                service.renewSubscription(operation, owner, subscription.getId(), 30, 2).status());
+        assertEquals(0, bean(PurchaseRepository.class).count());
+        assertEquals(0, bean(BalanceLogRepository.class).count());
+        verify(panel, never()).updateSubscription(any(), any(), anyInt());
+    }
+
+    @Test void devicePurchaseKeepsLegacyPricingAndWritesOneLedgerEntry() {
+        var owner = accountId(10);
+        var subscription = buyer.getSubscription();
+        credit(buyer, 400);
+        var panel = bean(RemnawaveClient.class);
+        when(panel.getUser(subscription.remnawaveRef())).thenReturn(RemnawaveUserResponse.builder().id(10L)
+                .expireAt(Instant.now().plusSeconds(10 * 86400L)).hwidDeviceLimit(1).build());
+        doAnswer(invocation -> {
+            assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
+            return null;
+        }).when(panel).updateDeviceCount(subscription.remnawaveRef(), 3);
+
+        assertEquals(20, bean(DevicePurchaseService.class).purchaseDevices(owner, subscription.getId(), 2));
+        var purchase = bean(PurchaseRepository.class).findAll().getFirst();
+        assertEquals(PurchaseType.DEVICE, purchase.getPurchaseType());
+        assertEquals(2, purchase.getDeviceCount());
+        assertEquals(380, balance.balance(owner));
+        verify(panel).updateDeviceCount(subscription.remnawaveRef(), 3);
     }
 
     @Test void everySubscriptionEntryPointRejectsForeignOwnerBeforeSideEffects() {
@@ -656,7 +840,8 @@ class AccountOperationsTest {
     @Import({BalanceServiceImpl.class, AccountService.class, SubscriptionAccessService.class, ReferralServiceImpl.class, PromoCodeServiceImpl.class,
             WithdrawalService.class, PaymentServiceImpl.class, PaymentPollingService.class, PaymentConfirmedListener.class, OperationsService.class,
             SubscriptionServiceImpl.class, TrafficPackageServiceImpl.class, DeviceService.class, DevicePurchaseService.class,
-            ExternalSubscriptionService.class, RegistrationServiceImpl.class, tg.configshop.listeners.RemnawaveEventListener.class})
+            ExternalSubscriptionService.class, RegistrationServiceImpl.class, SubscriptionChangeService.class,
+            SubscriptionChangeWorker.class, AccountMergeService.class})
     static class Config {
         @Bean LocalContainerEntityManagerFactoryBean entityManagerFactory(DataSource ds) {
             var factory = new LocalContainerEntityManagerFactoryBean(); factory.setDataSource(ds);
@@ -667,6 +852,9 @@ class AccountOperationsTest {
         }
         @Bean JpaTransactionManager transactionManager(EntityManagerFactory emf) { return new JpaTransactionManager(emf); }
         @Bean JdbcTemplate jdbcTemplate(DataSource ds) { return new JdbcTemplate(ds); }
+        @Bean org.springframework.jdbc.core.simple.JdbcClient jdbcClient(DataSource ds) {
+            return org.springframework.jdbc.core.simple.JdbcClient.create(ds);
+        }
         @Bean tg.configshop.external_api.remnawave.RemnawaveClient remnawaveClient() { return mock(tg.configshop.external_api.remnawave.RemnawaveClient.class); }
         @Bean tg.configshop.external_api.remnawave.config.RemnawaveApiVersion apiVersion() { return new tg.configshop.external_api.remnawave.config.RemnawaveApiVersion(3); }
         @Bean tg.configshop.quartz.services.SchedulerService scheduler() { return mock(tg.configshop.quartz.services.SchedulerService.class); }

@@ -38,17 +38,22 @@ public class SchedulerService {
     private static final String TRIAL_GROUP = "trial_checks";
 
     public void scheduleSubscriptionNotifications(UUID accountId, UUID subscriptionId, Instant expireAt) {
+        try {
+            rescheduleSubscriptionNotifications(accountId, subscriptionId, expireAt);
+        } catch (IllegalStateException e) {
+            if (!(e.getCause() instanceof SchedulerException)) throw e;
+            log.error("Failed to schedule subscription notifications: {}", e.getCause().getMessage());
+        }
+    }
+
+    public void rescheduleSubscriptionNotifications(UUID accountId, UUID subscriptionId, Instant expireAt) {
         subscriptions.requireOwned(accountId, subscriptionId);
         try {
-
             scheduleSubscriptionJob(accountId, subscriptionId, expireAt, Duration.ofDays(3), ExpirySubNotificationType.DAYS_LEFT_3.name());
-
             scheduleSubscriptionJob(accountId, subscriptionId, expireAt, Duration.ofDays(1), ExpirySubNotificationType.DAYS_LEFT_1.name());
-
             log.info("Scheduled subscription notifications for account {}", accountId);
-
         } catch (SchedulerException e) {
-            log.error("Failed to schedule subscription notifications: {}", e.getMessage());
+            throw new IllegalStateException("Could not reschedule subscription notifications", e);
         }
     }
 

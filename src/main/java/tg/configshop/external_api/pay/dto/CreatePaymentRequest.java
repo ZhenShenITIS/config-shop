@@ -9,6 +9,8 @@ public record CreatePaymentRequest (
         @JsonProperty("return")
         String returnUrl,
         String failedUrl,
-        String payload
+        String payload,
+        Metadata metadata
 ) {
+    public record Metadata(@JsonProperty("user_email") String userEmail) {}
 }

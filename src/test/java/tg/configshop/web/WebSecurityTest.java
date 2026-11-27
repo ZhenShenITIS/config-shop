@@ -24,18 +24,24 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 import tg.configshop.alerting.AlertService;
+import tg.configshop.dto.PaymentLimits;
+import tg.configshop.dto.PlategaCallback;
+import tg.configshop.dto.TopUpView;
 import tg.configshop.external_api.remnawave.webhook.InvalidRemnawaveWebhookSignatureException;
 import tg.configshop.external_api.remnawave.webhook.RemnawaveWebhookController;
 import tg.configshop.external_api.remnawave.webhook.RemnawaveWebhookVerificationService;
 import tg.configshop.model.WebUser;
 import tg.configshop.repositories.WebUserRepository;
 import tg.configshop.services.ExternalTrafficService;
+import tg.configshop.services.PaymentService;
+import tg.configshop.services.PlategaCallbackService;
 import tg.configshop.telegram.bot.WebhookBot;
 import tg.configshop.telegram.bot.WebhookController;
 import tg.configshop.telegram.config.TelegramWebhookSecret;
 import tg.configshop.web.security.WebJwtAuthenticationConverter;
 import tg.configshop.web.security.WebSecurityConfig;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Date;
@@ -57,10 +63,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(controllers = MeController.class, properties = {
         "web.auth.jwt-secret-base64=" + WebSecurityTest.SECRET_BASE64,
         "web.auth.issuer=config-shop", "web.auth.audience=config-shop-web-api", "start.webhook=true",
-        "TELEGRAM_BOT_TOKEN=test-token"
+        "TELEGRAM_BOT_TOKEN=test-token", "PAY_MERCHANT_ID=test-merchant", "PAY_SECRET=test-payment-secret"
 })
 @Import({WebSecurityConfig.class, WebJwtAuthenticationConverter.class, RemnawaveWebhookController.class,
-        WebhookController.class, TelegramWebhookSecret.class, WebSecurityTest.TestRoutes.class})
+        WebhookController.class, TelegramWebhookSecret.class, WebSecurityTest.TestRoutes.class,
+        PlategaWebhookController.class, WebTopUpController.class, WebAuthExceptionHandler.class})
 @ActiveProfiles("dev")
 class WebSecurityTest {
     static final String SECRET_BASE64 = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWYwMTIzNDU2Nzg5YWJjZGVmMDEyMzQ1Njc4OWFiY2RlZg==";
@@ -75,6 +82,8 @@ class WebSecurityTest {
     @MockitoBean ExternalTrafficService traffic;
     @MockitoBean WebhookBot webhookBot;
     @MockitoBean AlertService alerts;
+    @MockitoBean PlategaCallbackService paymentCallbacks;
+    @MockitoBean PaymentService payments;
 
     @BeforeEach
     void user() {
@@ -108,6 +117,56 @@ class WebSecurityTest {
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.error").value("unauthorized"));
         verifyNoInteractions(users);
+    }
+
+    @Test
+    void plategaWebhookUsesProviderHeadersAndDoesNotRequireJwt() throws Exception {
+        UUID id = UUID.randomUUID();
+        String body = """
+                {"id":"%s","amount":100.25,"currency":"RUB","status":"CONFIRMED","paymentMethod":2,"payload":"test"}
+                """.formatted(id);
+        mvc.perform(post("/api/webhooks/platega").contentType(MediaType.APPLICATION_JSON).content(body)
+                        .header("X-MerchantId", "test-merchant").header("X-Secret", "wrong"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/webhooks/platega").contentType(MediaType.APPLICATION_JSON).content(body)
+                        .header("X-MerchantId", "wrong").header("X-Secret", "test-payment-secret"))
+                .andExpect(status().isUnauthorized());
+        verifyNoInteractions(paymentCallbacks);
+
+        var callback = new PlategaCallback(id.toString(), new BigDecimal("100.25"), "RUB", "CONFIRMED", 2, "test");
+        mvc.perform(post("/api/webhooks/platega").contentType(MediaType.APPLICATION_JSON).content(body)
+                        .header("X-MerchantId", "test-merchant").header("X-Secret", "test-payment-secret"))
+                .andExpect(status().isOk()).andExpect(content().string(""));
+        verify(paymentCallbacks).applyCallback(callback);
+        mvc.perform(get("/api/webhooks/platega")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void webTopUpUsesVerifiedProfileAndOwnPaymentIdentifier() throws Exception {
+        UUID id = UUID.randomUUID();
+        String path = "/api/me/top-ups";
+        String authorization = "Bearer " + sign(validClaims().build());
+        mvc.perform(get(path + "/" + id)).andExpect(status().isUnauthorized());
+        verifyNoInteractions(payments);
+        when(payments.limits()).thenReturn(new PaymentLimits(100, 10_000));
+        mvc.perform(get(path + "/options").header(HttpHeaders.AUTHORIZATION, authorization))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.defaultMethod").value(2));
+        when(payments.getTopUp(id, ACCOUNT_ID)).thenReturn(Optional.of(
+                new TopUpView(id, 100, TopUpView.State.PENDING, "https://example.invalid/pay")));
+        mvc.perform(post(path).header(HttpHeaders.AUTHORIZATION, authorization).contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"id":"%s","amount":100.5,"paymentMethod":2}
+                                """.formatted(id)))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post(path).header(HttpHeaders.AUTHORIZATION, authorization).contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"id":"%s","amount":100,"paymentMethod":2}
+                                """.formatted(id)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.state").value("PENDING"));
+        String url = "https://crumpapp.xyz/dashboard?topUp=" + id;
+        verify(payments).createTopUp(id, 100L, 2, ACCOUNT_ID, "user@example.com", url, url);
+        mvc.perform(get(path + "/" + UUID.randomUUID()).header(HttpHeaders.AUTHORIZATION, authorization))
+                .andExpect(status().isNotFound());
     }
 
     @ParameterizedTest

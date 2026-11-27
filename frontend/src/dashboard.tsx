@@ -10,6 +10,7 @@ import {
 } from './api/generated/configShop';
 import { ApiError, setSession, withSessionLock } from './api/http';
 import { ErrorAlert } from './auth';
+import { TopUpAction } from './top-up';
 
 const rubles = new Intl.NumberFormat('ru-RU', {
   style: 'currency', currency: 'RUB', maximumFractionDigits: 0,
@@ -74,6 +75,7 @@ function DashboardView({ account }: { account: Dashboard }) {
         <span className="tile-icon"><Wallet size={20} /></span>
         <Text mt="md" c="dimmed">Баланс</Text>
         <Text className="balance-value">{rubles.format(account.balance)}</Text>
+        <TopUpAction />
       </Paper>
       <Paper className="dashboard-card" withBorder radius="lg">
         <span className="tile-icon"><Send size={19} /></span>

@@ -9,7 +9,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import tg.configshop.web.registration.WebAuthException;
 
 @RestControllerAdvice(assignableTypes = {WebRegistrationController.class, WebAuthenticationController.class,
-        WebDashboardController.class})
+        WebDashboardController.class, WebTopUpController.class})
 public class WebAuthExceptionHandler {
     @ExceptionHandler(WebAuthException.class)
     public ResponseEntity<ErrorResponse> authError(WebAuthException exception) {

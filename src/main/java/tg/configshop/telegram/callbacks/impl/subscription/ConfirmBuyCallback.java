@@ -12,7 +12,9 @@ import org.telegram.telegrambots.meta.generics.TelegramClient;
 import tg.configshop.constants.ButtonText;
 import tg.configshop.constants.CallbackName;
 import tg.configshop.constants.MessageText;
-import tg.configshop.model.Subscription;
+import tg.configshop.telegram.TelegramUserService;
+
+import java.util.UUID;
 import tg.configshop.services.SubscriptionService;
 import tg.configshop.telegram.callbacks.Callback;
 
@@ -22,6 +24,7 @@ import tg.configshop.telegram.callbacks.Callback;
 public class ConfirmBuyCallback implements Callback {
 
     private final SubscriptionService subscriptionService;
+    private final TelegramUserService users;
     private static final String PAYLOAD_SEPARATOR = ":";
 
     @Override
@@ -69,7 +72,10 @@ public class ConfirmBuyCallback implements Callback {
 
         String backCallbackData = getBackCallbackNameByDays(days) + PAYLOAD_SEPARATOR + devices;
 
-        String payCallbackData = CallbackName.PURCHASE.getCallbackName() + PAYLOAD_SEPARATOR + days + PAYLOAD_SEPARATOR + devices;
+        UUID subscriptionId = users.subscriptionId(callbackQuery.getFrom().getId());
+        String payCallbackData = String.join(PAYLOAD_SEPARATOR, CallbackName.PURCHASE.getCallbackName(),
+                Integer.toString(days), Integer.toString(devices), PurchaseButton.encode(UUID.randomUUID()),
+                PurchaseButton.encode(subscriptionId));
 
         InlineKeyboardMarkup keyboard = InlineKeyboardMarkup.builder()
                 .keyboardRow(new InlineKeyboardRow(

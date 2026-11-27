@@ -30,7 +30,9 @@ public class PlategaPayment {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
-    @Column(name = "provider_payment_id", unique = true, nullable = false)
+    @Column(name = "request_id", unique = true)
+    private UUID requestId;
+    @Column(name = "provider_payment_id", unique = true)
     private String transactionId;
     @ManyToOne(optional = false)
     private Account account;

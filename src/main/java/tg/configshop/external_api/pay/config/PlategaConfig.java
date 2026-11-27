@@ -22,6 +22,7 @@ public class PlategaConfig {
                 .setResponseTimeout(Timeout.ofSeconds(20))
                 .build();
         CloseableHttpClient httpClient = HttpClients.custom()
+                .disableAutomaticRetries()
                 .setDefaultRequestConfig(requestConfig)
                 .build();
         HttpComponentsClientHttpRequestFactory factory = new HttpComponentsClientHttpRequestFactory(httpClient);

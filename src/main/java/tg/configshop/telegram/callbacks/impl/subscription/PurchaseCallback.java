@@ -14,9 +14,13 @@ import org.telegram.telegrambots.meta.generics.TelegramClient;
 import tg.configshop.constants.ButtonText;
 import tg.configshop.constants.CallbackName;
 import tg.configshop.constants.MessageText;
+import tg.configshop.exceptions.subscription.SubscriptionChangeInProgressException;
 import tg.configshop.exceptions.subscription.InsufficientBalanceException;
 import tg.configshop.services.SubscriptionService;
 import tg.configshop.telegram.callbacks.Callback;
+
+import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -47,7 +51,7 @@ public class PurchaseCallback implements Callback {
             return;
         }
 
-        if (parts.length != 3) {
+        if (parts.length != 3 && parts.length != 5) {
             new BuySubMenuCallback(subscriptionService).processCallback(callbackQuery, telegramClient);
             return;
         }
@@ -61,15 +65,38 @@ public class PurchaseCallback implements Callback {
             return;
         }
         try {
-            subscriptionService.buySubscription(userService.accountId(userId), userService.subscriptionId(userId), days, devices);
-            sendSuccessMessage(telegramClient, chatId, messageId);
+            UUID subscriptionId = parts.length == 5 ? PurchaseButton.decode(parts[4]) : userService.subscriptionId(userId);
+            UUID operationId = parts.length == 5 ? PurchaseButton.decode(parts[3])
+                    : UUID.nameUUIDFromBytes(("legacy-renewal:" + chatId + ":" + messageId + ":" + data)
+                        .getBytes(StandardCharsets.UTF_8));
+            var purchase = subscriptionService.renewSubscription(operationId, userService.accountId(userId),
+                    subscriptionId, days, devices);
+            switch (purchase.status()) {
+                case COMPLETED -> sendSuccessMessage(telegramClient, chatId, messageId);
+                case INSUFFICIENT_BALANCE -> sendInsufficientBalanceMessage(telegramClient, chatId, messageId);
+                case MANUAL_REVIEW -> sendUnknownError(telegramClient, chatId, messageId);
+                default -> sendPending(telegramClient, chatId, messageId, data);
+            }
         } catch (InsufficientBalanceException e) {
             sendInsufficientBalanceMessage(telegramClient, chatId, messageId);
+        } catch (SubscriptionChangeInProgressException e) {
+            sendPending(telegramClient, chatId, messageId, data);
         } catch (tg.configshop.telegram.SubscriptionSelectionException e) {
             throw e;
         } catch (Exception e) {
             sendUnknownError(telegramClient, chatId, messageId);
         }
+    }
+
+    private void sendPending(TelegramClient client, Long chatId, Integer messageId, String data) {
+        var keyboard = InlineKeyboardMarkup.builder()
+                .keyboardRow(new InlineKeyboardRow(InlineKeyboardButton.builder()
+                        .text("Проверить продление").callbackData(data).build()))
+                .keyboardRow(new InlineKeyboardRow(InlineKeyboardButton.builder()
+                        .text(ButtonText.BACK_TO_MENU.getText())
+                        .callbackData(CallbackName.BACK_TO_MENU.getCallbackName()).build()))
+                .build();
+        editMessage(client, chatId, messageId, "Продление обрабатывается. Проверьте статус чуть позже.", keyboard);
     }
 
     private void sendSuccessMessage(TelegramClient client, Long chatId, Integer messageId) {

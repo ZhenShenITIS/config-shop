@@ -15,6 +15,7 @@ import tg.configshop.constants.CallbackName;
 import tg.configshop.constants.MessageText;
 import tg.configshop.exceptions.devices.TooManyDevicesException;
 import tg.configshop.exceptions.subscription.InsufficientBalanceException;
+import tg.configshop.exceptions.subscription.SubscriptionChangeInProgressException;
 import tg.configshop.model.BotUser;
 import tg.configshop.services.DevicePurchaseService;
 import tg.configshop.services.SubscriptionService;
@@ -73,6 +74,14 @@ public class ConfirmDevicePurchaseCallback implements Callback {
             BotUser user = userService.getUser(userId);
             sendInsufficientBalanceMessage(telegramClient, chatId, messageId,
                     deviceCount, (int) totalPrice, (int) userService.getBalance(user.getId()));
+        } catch (SubscriptionChangeInProgressException e) {
+            var keyboard = InlineKeyboardMarkup.builder()
+                    .keyboardRow(new InlineKeyboardRow(InlineKeyboardButton.builder()
+                            .text(ButtonText.BACK_TO_MENU.getText())
+                            .callbackData(CallbackName.BACK_TO_MENU.getCallbackName()).build()))
+                    .build();
+            editMessage(telegramClient, chatId, messageId,
+                    "Изменение подписки обрабатывается. Проверьте подписку чуть позже.", keyboard);
         } catch (TooManyDevicesException e) {
             sendTooManyDevicesMessage(telegramClient, chatId, messageId);
         } catch (tg.configshop.telegram.SubscriptionSelectionException e) {
