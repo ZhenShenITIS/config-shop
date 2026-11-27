@@ -22,6 +22,8 @@ import tg.configshop.telegram.dialogstages.DialogStage;
 import tg.configshop.web.registration.TelegramWebLinkService;
 import tg.configshop.web.registration.WebAuthException;
 
+import java.util.Objects;
+
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -37,9 +39,15 @@ public class WebsiteCodeDialogStage implements DialogStage {
 
     @Override
     public void processCallbackQuery(CallbackQuery query, TelegramClient client) {
-        if (query.getMessage() == null || query.getMessage().getChatId() != query.getFrom().getId()) return;
+        Long telegramId = query.getFrom().getId();
+        if (query.getMessage() == null || !Objects.equals(query.getMessage().getChatId(), telegramId)) return;
         if (CallbackName.BACK_TO_MENU.getCallbackName().equals(query.getData())) {
-            states.put(query.getFrom().getId(), DialogStageName.NONE);
+            states.put(telegramId, DialogStageName.NONE);
+            try {
+                client.execute(AnswerCallbackQuery.builder().callbackQueryId(query.getId()).build());
+            } catch (TelegramApiException e) {
+                log.warn("Cannot acknowledge website code cancellation for Telegram user {}", telegramId, e);
+            }
             menu.processCallback(query, client);
             return;
         }
